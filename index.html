@@ -433,49 +433,52 @@
         </div>
       </div>
     </div>
-    <!-- 単元マネージャーモーダル -->
-    <div class="modal fade" id="unitManagerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title fw-bold"><i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt></ruby>しい<ruby>単元<rt>
-                  たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby></h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+  </div>
+  </div>
+
+  <!-- 単元マネージャーモーダル -->
+  <div class="modal fade" id="unitManagerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt></ruby>しい<ruby>単元<rt>
+                たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby></h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info small" role="alert">
+            <i class="bi bi-info-circle"></i> 新しい単元を作成すると、現在の単元はアーカイブされます（過去の記録として残ります）。
           </div>
-          <div class="modal-body">
-            <div class="alert alert-info small" role="alert">
-              <i class="bi bi-info-circle"></i> 新しい単元を作成すると、現在の単元はアーカイブされます（過去の記録として残ります）。
+          <form id="form-create-unit" class="needs-validation" novalidate>
+            <div class="mb-3">
+              <label class="form-label fw-bold">単元名</label>
+              <input type="text" class="form-control" id="new-unit-name" placeholder="例: 跳び箱運動" required>
             </div>
-            <form id="form-create-unit" class="needs-validation" novalidate>
-              <div class="mb-3">
-                <label class="form-label fw-bold">単元名</label>
-                <input type="text" class="form-control" id="new-unit-name" placeholder="例: 跳び箱運動" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-bold">総時間数（全何時間か）</label>
-                <input type="number" class="form-control" id="new-unit-sessions" value="6" min="1" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-bold">単元の大きな目標</label>
-                <textarea class="form-control" id="new-unit-goal" rows="2" placeholder="例: 自分にあった高さを選び、美しいフォームで跳ぼう"
-                  required></textarea>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-            <button type="button" class="btn btn-primary fw-bold" onclick="submitNewUnit()">単元を作成して開始する</button>
-          </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">総時間数（全何時間か）</label>
+              <input type="number" class="form-control" id="new-unit-sessions" value="6" min="1" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">単元の大きな目標</label>
+              <textarea class="form-control" id="new-unit-goal" rows="2" placeholder="例: 自分にあった高さを選び、美しいフォームで跳ぼう"
+                required></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary fw-bold" onclick="submitNewUnit()">単元を作成して開始する</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Bootstrap Bundle with Popper -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <?!= include('js'); ?>
+  <?!= include('js'); ?>
 </body>
 
 </html>
