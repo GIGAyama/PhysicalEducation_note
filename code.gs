@@ -188,7 +188,7 @@ function getUserInfo() {
 }
 
 function getStudentData(email) {
-  const { configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
+  const { ss, configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
   
   // 設定取得
   const configData = configSheet.getDataRange().getValues();
@@ -348,7 +348,7 @@ function saveLog(email, type, aspect, comment, targetEmail = "") {
 }
 
 function getTeacherData() {
-  const { configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
+  const { ss, configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
   
   const configData = configSheet.getDataRange().getValues();
   let currentUnit = '未設定';
