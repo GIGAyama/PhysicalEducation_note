@@ -1,0 +1,64 @@
+<style>
+  /* GIGA Standard v2: Modern Google Style */
+  :root {
+    --primary-color: #1a73e8; /* Google Blue */
+    --bg-color: #f8f9fa;      /* Off-white */
+  }
+
+  body {
+    font-family: 'Zen Maru Gothic', sans-serif;
+    background-color: var(--bg-color);
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ルビの調整: 読みやすくスペースを確保 */
+  ruby {
+    ruby-position: over;
+  }
+  rt {
+    font-size: 0.6em;
+    color: #666;
+  }
+
+  /* 全画面ローディングオーバーレイ */
+  #loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.85);
+    z-index: 9999;
+    display: flex; /* 初期表示はflexで中央揃え */
+  }
+  
+  /* ボタンやカードの角丸強化 */
+  .rounded-3 { border-radius: 0.75rem !important; }
+  .rounded-pill { border-radius: 50rem !important; }
+
+  /* 入力タブのデザイン */
+  .nav-pills .nav-link {
+    color: var(--primary-color);
+    background-color: transparent;
+  }
+  .nav-pills .nav-link.active {
+    background-color: var(--primary-color);
+    color: white;
+  }
+
+  /* 教員用テーブルのアラートスタイル */
+  .alert-row {
+    background-color: #fff3cd !important; /* 薄い黄色 */
+  }
+  .missing-text {
+    color: #dc3545; /* 赤 */
+    font-weight: bold;
+  }
+  
+  /* 観点バッジの色 */
+  .badge-shiru { background-color: #ffc107; color: #000; } /* 黄 */
+  .badge-miru { background-color: #17a2b8; color: #fff; }  /* 水色 */
+  .badge-suru { background-color: #dc3545; color: #fff; }  /* 赤 */
+  .badge-sasaeru { background-color: #28a745; color: #fff;} /* 緑 */
+</style>
