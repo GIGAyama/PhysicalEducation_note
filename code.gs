@@ -11,7 +11,7 @@ const PROPERTIES = PropertiesService.getScriptProperties();
 const DEF_MEMBERS = ['メールアドレス', '出席番号', '氏名', '権限'];
 const DEF_LOGS = ['タイムスタンプ', 'メールアドレス', '単元名', '入力タイプ', '観点', 'コメント', 'deletedAt', '宛先', '単元ID', '授業回'];
 const DEF_CONFIG = ['項目', '値'];
-const DEF_UNITS = ['単元ID', '単元名', '総時間数', '単元目標', '作成日時', 'ステータス']; // ステータス: active or archived
+const DEF_UNITS = ['単元ID', '単元名', '総時間数', '単元目標', '作成日時', 'ステータス', '授業詳細JSON'];
 
 // ==========================================
 // 自己修復 & ヘッダーマッピング機能 (Auto-Recovery)
@@ -43,10 +43,8 @@ function getHealthySpreadsheet() {
   const configMap = ensureHeadersAndGetMap(configSheet, DEF_CONFIG);
   const unitMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
 
-  // 設定シートの必須項目デフォルト値確保
-  ensureConfigDefault(configSheet, configMap, '現在の単元名', '未設定'); // 下位互換用
-  ensureConfigDefault(configSheet, configMap, '現在の単元ID', '');
-  ensureConfigDefault(configSheet, configMap, '現在の授業回', '1');
+  // スプレッドシート側の仕様変更により「現在の単元」などは設定シートを使わない
+  // （下位互換性のため残すことは可能だが、今後は単元マスターのみ参照）
 
   return { ss, membersSheet, membersMap, logSheet, logMap, configSheet, configMap, unitSheet, unitMap };
 }
@@ -190,35 +188,26 @@ function getUserInfo() {
 function getStudentData(email) {
   const { ss, configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
   
-  // 設定取得
-  const configData = configSheet.getDataRange().getValues();
-  let currentUnit = '未設定';
-  let currentUnitId = '';
-  let currentSession = '1';
-  let refMediaId = '';
-  for(let i = 1; i < configData.length; i++){
-    const k = configData[i][configMap['項目']];
-    const v = configData[i][configMap['値']];
-    if(k === '現在の単元名') currentUnit = v;
-    if(k === '現在の単元ID') currentUnitId = v;
-    if(k === '現在の授業回') currentSession = v;
-    if(k === 'お手本メディアID') refMediaId = v;
-  }
-
-  // 単元マスターから詳細情報取得
-  let totalSessions = '';
-  let unitGoal = '';
-  if (currentUnitId) {
-    const unitSheet = ss.getSheetByName('単元マスター');
-    if (unitSheet) {
-      const uData = unitSheet.getDataRange().getValues();
-      const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
-      for (let i = 1; i < uData.length; i++) {
-        if (uData[i][uMap['単元ID']] === currentUnitId) {
-          totalSessions = uData[i][uMap['総時間数']];
-          unitGoal = uData[i][uMap['単元目標']];
-          break;
-        }
+  // アクティブな複数単元をマスターから取得
+  let activeUnits = [];
+  const unitSheet = ss.getSheetByName('単元マスター');
+  if (unitSheet) {
+    const uData = unitSheet.getDataRange().getValues();
+    const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
+    for (let i = 1; i < uData.length; i++) {
+      if (uData[i][uMap['ステータス']] === 'active') {
+        let details = [];
+        try {
+          details = JSON.parse(uData[i][uMap['授業詳細JSON']] || '[]');
+        } catch(e) { /* parse error */ }
+        
+        activeUnits.push({
+          id: uData[i][uMap['単元ID']],
+          name: uData[i][uMap['単元名']],
+          totalSessions: uData[i][uMap['総時間数']],
+          goal: uData[i][uMap['単元目標']],
+          sessions: details
+        });
       }
     }
   }
@@ -301,13 +290,8 @@ function getStudentData(email) {
     receivedThanks: receivedThanks.reverse(),
     hasTodayGoal: hasTodayGoal,
     hasTodayReflect: hasTodayReflect,
-    currentUnit: currentUnit,
-    currentUnitId: currentUnitId,
-    currentSession: currentSession,
-    totalSessions: totalSessions,
-    unitGoal: unitGoal,
-    classmates: classmates,
-    refMediaId: refMediaId
+    activeUnits: activeUnits,
+    classmates: classmates
   };
 }
 
@@ -350,32 +334,26 @@ function saveLog(email, type, aspect, comment, targetEmail = "") {
 function getTeacherData() {
   const { ss, configSheet, configMap, membersSheet, membersMap, logSheet, logMap } = getHealthySpreadsheet();
   
-  const configData = configSheet.getDataRange().getValues();
-  let currentUnit = '未設定';
-  let currentUnitId = '';
-  let currentSession = '1';
-  let refMediaId = '';
-  for(let i = 1; i < configData.length; i++){
-    const k = configData[i][configMap['項目']];
-    const v = configData[i][configMap['値']];
-    if(k === '現在の単元名') currentUnit = v;
-    if(k === '現在の単元ID') currentUnitId = v;
-    if(k === '現在の授業回') currentSession = v;
-    if(k === 'お手本メディアID') refMediaId = v;
-  }
-  
-  // 単元マスターから詳細情報取得
-  let totalSessions = '';
-  if (currentUnitId) {
-    const unitSheet = ss.getSheetByName('単元マスター');
-    if (unitSheet) {
-      const uData = unitSheet.getDataRange().getValues();
-      const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
-      for (let i = 1; i < uData.length; i++) {
-        if (uData[i][uMap['単元ID']] === currentUnitId) {
-          totalSessions = uData[i][uMap['総時間数']];
-          break;
-        }
+  // アクティブな複数単元をマスターから取得
+  let activeUnits = [];
+  const unitSheet = ss.getSheetByName('単元マスター');
+  if (unitSheet) {
+    const uData = unitSheet.getDataRange().getValues();
+    const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
+    for (let i = 1; i < uData.length; i++) {
+      if (uData[i][uMap['ステータス']] === 'active') {
+        let details = [];
+        try {
+          details = JSON.parse(uData[i][uMap['授業詳細JSON']] || '[]');
+        } catch(e) {}
+        
+        activeUnits.push({
+          id: uData[i][uMap['単元ID']],
+          name: uData[i][uMap['単元名']],
+          totalSessions: uData[i][uMap['総時間数']],
+          goal: uData[i][uMap['単元目標']],
+          sessions: details
+        });
       }
     }
   }
@@ -448,11 +426,7 @@ function getTeacherData() {
   students.sort((a, b) => (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0));
   return { 
     students: students, 
-    currentUnit: currentUnit, 
-    currentUnitId: currentUnitId,
-    currentSession: currentSession,
-    totalSessions: totalSessions,
-    refMediaId: refMediaId 
+    activeUnits: activeUnits
   };
 }
 
@@ -618,24 +592,15 @@ function getAllLogsForCsv() {
 }
 
 // ==========================================
-// 単元管理 API (Phase 1追加機能)
+// 単元管理 API (Phase 1 複数単元並行稼働対応)
 // ==========================================
 
-function createUnit(unitName, totalSessions, unitGoal) {
-  const { ss, configSheet, configMap, unitSheet, unitMap } = getHealthySpreadsheet();
+function createUnit(unitName, totalSessions, unitGoal, sessionsJsonData) {
+  const { ss, unitSheet, unitMap } = getHealthySpreadsheet();
   
-  // 重複チェックなどはせず単純に新規作成する
   const newUnitId = 'U-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
   
-  // 全既存単元をアーカイブ
-  const uData = unitSheet.getDataRange().getValues();
-  for (let i = 1; i < uData.length; i++) {
-    if (uData[i][unitMap['ステータス']] === 'active') {
-      unitSheet.getRange(i + 1, unitMap['ステータス'] + 1).setValue('archived');
-    }
-  }
-
-  // 新規単元の追加
+  // 新規単元の追加（過去の単元はアーカイブせず、複数activeを許容する）
   let newRow = new Array(DEF_UNITS.length).fill('');
   newRow[unitMap['単元ID']] = newUnitId;
   newRow[unitMap['単元名']] = unitName;
@@ -643,34 +608,22 @@ function createUnit(unitName, totalSessions, unitGoal) {
   newRow[unitMap['単元目標']] = unitGoal;
   newRow[unitMap['作成日時']] = new Date();
   newRow[unitMap['ステータス']] = 'active';
+  newRow[unitMap['授業詳細JSON']] = JSON.stringify(sessionsJsonData || []);
   unitSheet.appendRow(newRow);
-
-  // 設定シートの更新（古い「単元名」キーも一応塞いでおく）
-  updateConfigValue(configSheet, configMap, '現在の単元名', unitName);
-  updateConfigValue(configSheet, configMap, '現在の単元ID', newUnitId);
-  updateConfigValue(configSheet, configMap, '現在の授業回', '1');
 
   return { success: true, newUnitId: newUnitId };
 }
 
-function updateSession(sessionNumber) {
-  const { configSheet, configMap } = getHealthySpreadsheet();
-  updateConfigValue(configSheet, configMap, '現在の授業回', sessionNumber.toString());
-  return { success: true, session: sessionNumber };
-}
-
-// 共通ヘルパー: 設定シートの特定キーを更新する
-function updateConfigValue(sheet, map, key, newValue) {
-  const data = sheet.getDataRange().getValues();
-  for(let i = 1; i < data.length; i++){
-    if(data[i][map['項目']] === key) {
-      sheet.getRange(i + 1, map['値'] + 1).setValue(newValue);
-      return;
+function archiveUnit(unitId) {
+  const { unitSheet, unitMap } = getHealthySpreadsheet();
+  const uData = unitSheet.getDataRange().getValues();
+  for (let i = 1; i < uData.length; i++) {
+    if (uData[i][unitMap['単元ID']] === unitId) {
+      unitSheet.getRange(i + 1, unitMap['ステータス'] + 1).setValue('archived');
+      return { success: true };
     }
   }
-  // なければ追記
-  let newRow = [];
-  newRow[map['項目']] = key;
-  newRow[map['値']] = newValue;
-  sheet.appendRow(newRow);
+  return { success: false, message: '単元が見つかりません' };
 }
+
+// (updateSession, updateConfigValueなどの古い設定APIは廃止)

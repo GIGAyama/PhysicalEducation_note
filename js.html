@@ -87,22 +87,6 @@
 
         document.getElementById('current-unit-badge').textContent = `現在の単元：${data.currentUnit}`;
 
-        // 進捗プログレスバーの計算と描画
-        const curSession = parseInt(data.currentSession, 10) || 1;
-        const totSessions = parseInt(data.totalSessions, 10) || 1;
-        document.getElementById('student-session-text').textContent = `第${curSession}時 / 全${totSessions}時間`;
-        document.getElementById('student-unit-goal').textContent = data.unitGoal || "未設定";
-
-        const progressPct = Math.min(100, Math.round((curSession / totSessions) * 100));
-        document.getElementById('student-progress-bar').style.width = `${progressPct}%`;
-
-        const btnRef = document.getElementById('btn-view-ref');
-        if (data.refMediaId) {
-          btnRef.classList.remove('d-none');
-        } else {
-          btnRef.classList.add('d-none');
-        }
-
         const targetSelect = document.getElementById('thanks-target');
         targetSelect.innerHTML = '<option value="" selected disabled>選んでください</option>';
         data.classmates.forEach(c => {
@@ -115,9 +99,9 @@
         drawRadarChart(data.radarData);
 
         // 履歴を保持してフィルタUIを構築
-        studentAllLogs = data.logs;
-        buildHistoryFilter(data.currentUnit);
-        filterHistory(); // 初期描画
+        studentAllLogs = data.logs || [];
+        buildHistoryFilter(studentAllLogs);
+        filterHistory();
 
         renderReceivedThanks(data.receivedThanks);
 
@@ -129,6 +113,8 @@
           document.getElementById('reflect-alert').classList.remove('d-none');
           document.getElementById('form-reflect').classList.add('d-none');
         }
+
+        buildClassmateSelect(data.classmates);
       })
       .catch(err => {
         hideLoading();
@@ -146,7 +132,7 @@
       }
       const aspect = document.getElementById('goal-aspect').value;
       if (!aspect) return;
-      submitLog('事前目標', aspect, '');
+      submitLog('事前目標', 'goal-aspect', null, 'form-goal', 'goal-alert');
     });
 
     const reflectForm = document.getElementById('form-reflect');
@@ -159,7 +145,7 @@
       const aspect = document.getElementById('reflect-aspect').value;
       const comment = document.getElementById('reflect-comment').value;
       if (!aspect || !comment) return;
-      submitLog('事後振り返り', aspect, comment);
+      submitLog('事後振り返り', 'reflect-aspect', 'reflect-comment', 'form-reflect', 'reflect-alert');
     });
 
     const thanksForm = document.getElementById('form-thanks');
@@ -173,35 +159,59 @@
       const comment = document.getElementById('thanks-comment').value;
       if (!targetEmail || !comment) return;
 
-      showLoading();
-      runGoogleScript('saveLog', currentUser.email, 'サンクスカード', '支える', comment, targetEmail)
-        .then(res => {
-          Swal.fire({
-            icon: 'success',
-            title: 'カードを送りました！',
-            text: '友達にありがとうの気持ちが届きました！',
-            confirmButtonColor: '#28a745'
-          });
-          document.getElementById('thanks-comment').value = '';
-          document.getElementById('thanks-target').selectedIndex = 0; // 正しくdisabledオプションに戻す
-          thanksForm.classList.remove('was-validated');
-          loadStudentData();
-        })
-        .catch(err => {
-          hideLoading();
-          showError('送信に失敗しました。');
-        });
+      submitLog('称賛', 'thanks-aspect', 'thanks-comment', 'form-thanks', 'thanks-alert');
     });
   }
 
-  function submitLog(type, aspect, comment) {
+  // 汎用記録送信ロジック
+  function submitLog(type, aspectId, commentId, formId, alertId) {
+    const form = document.getElementById(formId);
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const aspect = document.getElementById(aspectId).value;
+    const comment = commentId ? document.getElementById(commentId).value : '';
+    let targetEmail = '';
+
+    if (type === '称賛') {
+      const select = document.getElementById('thanks-target');
+      if (select.value === "") {
+        showError('送る相手を選んでください。');
+        return;
+      }
+      targetEmail = select.value;
+    }
+
+    // 単元と時間の選択状態をチェック
+    const selectedUnitId = document.getElementById('student-unit-select').value;
+    const selectedSession = document.getElementById('student-session-select').value;
+
+    if (!selectedUnitId || !selectedSession) {
+      showError('「今日学習する単元」と「時間」を選んでから記録してください。');
+      return;
+    }
+
+    const selectedUnitName = studentAllActiveUnits.find(u => u.id === selectedUnitId)?.name || '不明';
+
     showLoading();
-    runGoogleScript('saveLog', currentUser.email, type, aspect, comment)
+    runGoogleScript('saveLog', currentUser.email, type, aspect, comment, targetEmail, selectedUnitName, selectedUnitId, selectedSession)
       .then(res => {
+        hideLoading();
         Swal.fire({
           icon: 'success', title: '送信完了！', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
         });
-        loadStudentData();
+
+        if (type === '称賛') {
+          form.reset();
+          form.classList.remove('was-validated');
+        } else {
+          document.getElementById(alertId).classList.remove('d-none');
+          form.classList.add('d-none');
+        }
+
+        if (type !== '称賛') loadStudentData();
       })
       .catch(err => {
         hideLoading();
@@ -258,28 +268,19 @@
   }
 
   // ==== 履歴フィルタリング機能 ====
-  function buildHistoryFilter(currentUnit) {
+  function buildHistoryFilter(studentLogs) {
     const filterSelect = document.getElementById('history-filter');
-    filterSelect.innerHTML = `<option value="all">すべて表示</option>`;
+    filterSelect.innerHTML = `<option value="all" selected>すべて表示</option>`;
 
-    // ログから存在する単元名を抽出して重複排除（今の単元を上へ）
-    let units = [...new Set(studentAllLogs.map(l => l.unit))];
-    if (units.includes(currentUnit)) {
-      units = units.filter(u => u !== currentUnit);
-      units.unshift(currentUnit);
-    }
+    // ログから存在する単元名を抽出して重複排除
+    let units = [...new Set(studentAllLogs.map(l => l.unit))].filter(Boolean);
 
     units.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u;
-      opt.textContent = u === currentUnit ? `[今] ${u}` : u;
+      opt.textContent = u;
       filterSelect.appendChild(opt);
     });
-
-    // 初期は「今の単元」を選択させる（存在すれば）
-    if (units.length > 0 && currentUnit !== '未設定') {
-      filterSelect.value = currentUnit;
-    }
   }
 
   function filterHistory() {
@@ -317,34 +318,28 @@
   }
 
   // ==== お手本画像モーダル ====
-  function openReferenceModal() {
+  function openReferenceModalFor(mediaId) {
     const imgEl = document.getElementById('reference-image');
     const loadingEl = document.getElementById('ref-loading');
     const modal = new bootstrap.Modal(document.getElementById('referenceModal'));
 
     modal.show();
 
-    if (currentRefBase64) {
-      loadingEl.classList.add('d-none');
-      imgEl.src = currentRefBase64;
-      imgEl.classList.remove('d-none');
-    } else {
-      loadingEl.classList.remove('d-none');
-      imgEl.classList.add('d-none');
+    loadingEl.classList.remove('d-none');
+    imgEl.classList.add('d-none');
 
-      runGoogleScript('getReferenceImageBase64')
-        .then(base64 => {
-          currentRefBase64 = base64;
-          loadingEl.classList.add('d-none');
-          imgEl.src = base64;
-          imgEl.classList.remove('d-none');
-        })
-        .catch(err => {
-          loadingEl.classList.add('d-none');
-          modal.hide();
-          showError('画像を取得できませんでした。先生に権限やIDを確認してもらってください。');
-        });
-    }
+    // mediaId を渡してベース64を取得するバックエンドAPIへ
+    runGoogleScript('getReferenceImageBase64', mediaId)
+      .then(base64 => {
+        loadingEl.classList.add('d-none');
+        imgEl.src = base64;
+        imgEl.classList.remove('d-none');
+      })
+      .catch(err => {
+        loadingEl.classList.add('d-none');
+        modal.hide();
+        showError('画像を取得できませんでした。先生による設定か共有権限を確認してください。');
+      });
   }
 
   // ==== 教員用画面ロジック ====
@@ -353,13 +348,39 @@
     runGoogleScript('getTeacherData')
       .then(data => {
         hideLoading();
-        document.getElementById('teacher-current-unit').textContent = data.currentUnit;
-        document.getElementById('teacher-total-sessions').textContent = data.totalSessions || '-';
-        document.getElementById('teacher-current-session').value = data.currentSession || 1;
 
-        if (data.refMediaId) {
-          document.getElementById('input-ref-id').value = data.refMediaId;
+        // 進行中の単元一覧の描画
+        const listContainer = document.getElementById('teacher-active-units-list');
+        const emptyMsg = document.getElementById('teacher-no-units-msg');
+        listContainer.innerHTML = '';
+
+        if (!data.activeUnits || data.activeUnits.length === 0) {
+          emptyMsg.classList.remove('d-none');
+        } else {
+          emptyMsg.classList.add('d-none');
+          data.activeUnits.forEach(unit => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 col-lg-4';
+            col.innerHTML = `
+              <div class="card h-100 border-primary border-opacity-25 shadow-sm">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title fw-bold text-primary m-0">${escapeHtml(unit.name)}</h6>
+                    <span class="badge bg-light text-dark border">全${unit.totalSessions}時間</span>
+                  </div>
+                  <p class="card-text small text-muted mb-3" style="min-height: 2.5em;">${escapeHtml(unit.goal)}</p>
+                  <div class="d-flex justify-content-end">
+                    <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="archiveUnit('${unit.id}', '${escapeHtml(unit.name)}')">
+                      <i class="bi bi-box-arrow-down"></i> 終了する
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+            listContainer.appendChild(col);
+          });
         }
+
         renderTeacherTable(data.students);
       })
       .catch(err => {
@@ -372,8 +393,41 @@
   function openUnitManagerModal() {
     document.getElementById('form-create-unit').reset();
     document.getElementById('form-create-unit').classList.remove('was-validated');
+    generateSessionInputs(); // 初期化時に生成
     const modal = new bootstrap.Modal(document.getElementById('unitManagerModal'));
     modal.show();
+  }
+
+  function generateSessionInputs() {
+    const total = parseInt(document.getElementById('new-unit-sessions').value, 10);
+    const container = document.getElementById('dynamic-sessions-container');
+    container.innerHTML = '';
+
+    if (isNaN(total) || total < 1 || total > 30) {
+      container.innerHTML = '<div class="text-danger small">1〜30の範囲で入力してください。</div>';
+      return;
+    }
+
+    for (let i = 1; i <= total; i++) {
+      const div = document.createElement('div');
+      div.className = 'mb-3 pb-3 border-bottom';
+      div.innerHTML = `
+        <div class="fw-bold text-secondary mb-2">第${i}時</div>
+        <div class="row g-2">
+          <div class="col-md-7">
+            <input type="text" class="form-control form-control-sm session-goal-input" data-session="${i}" placeholder="この時間のめあて" required>
+            <div class="invalid-feedback">入力は必須です</div>
+          </div>
+          <div class="col-md-5">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-image"></i></span>
+              <input type="text" class="form-control session-media-input" data-session="${i}" placeholder="お手本ID(任意)">
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    }
   }
 
   function submitNewUnit() {
@@ -384,16 +438,29 @@
     }
 
     const uName = document.getElementById('new-unit-name').value;
-    const uSessions = document.getElementById('new-unit-sessions').value;
+    const uSessions = parseInt(document.getElementById('new-unit-sessions').value, 10);
     const uGoal = document.getElementById('new-unit-goal').value;
+
+    // 各時間詳細配列の組み立て
+    const sessionsArray = [];
+    const goalInputs = document.querySelectorAll('.session-goal-input');
+    const mediaInputs = document.querySelectorAll('.session-media-input');
+
+    for (let i = 0; i < uSessions; i++) {
+      sessionsArray.push({
+        session: parseInt(goalInputs[i].dataset.session, 10),
+        goal: goalInputs[i].value,
+        mediaId: mediaInputs[i].value
+      });
+    }
 
     showLoading();
     bootstrap.Modal.getInstance(document.getElementById('unitManagerModal')).hide();
 
-    runGoogleScript('createUnit', uName, uSessions, uGoal)
+    runGoogleScript('createUnit', uName, uSessions, uGoal, sessionsArray)
       .then(res => {
         if (res.success) {
-          Swal.fire({ icon: 'success', title: '新しい単元を開始しました', confirmButtonColor: '#1a73e8' });
+          Swal.fire({ icon: 'success', title: '新しい単元パッケージを開始しました', confirmButtonColor: '#1a73e8' });
           loadTeacherData(); // 再読み込み
         }
       })
@@ -403,41 +470,35 @@
       });
   }
 
-  function changeSessionNumber() {
-    const newSession = document.getElementById('teacher-current-session').value;
-    if (!newSession || newSession < 1) return;
-
-    showLoading();
-    runGoogleScript('updateSession', newSession)
-      .then(res => {
-        hideLoading();
-        if (res.success) {
-          Swal.fire({ icon: 'success', title: `第${res.session}時に変更しました`, toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-        }
-      })
-      .catch(err => {
-        hideLoading();
-        showError('授業回の更新に失敗しました。');
-      });
-  }
-
-  function changeRefMediaId() {
-    const newId = document.getElementById('input-ref-id').value.trim();
-    if (!newId) return;
-
-    showLoading();
-    runGoogleScript('updateRefMediaId', newId)
-      .then(res => {
-        hideLoading();
-        if (res.success) {
-          currentRefBase64 = null;
-          Swal.fire({ icon: 'success', title: 'お手本画像を設定しました', text: '児童の画面に「お手本を見る」ボタンが表示されます', confirmButtonColor: '#17a2b8' });
-        }
-      })
-      .catch(err => {
-        hideLoading();
-        showError('設定に失敗しました。ファイルIDが正しいか確認してください。');
-      });
+  function archiveUnit(unitId, unitName) {
+    Swal.fire({
+      title: '単元を終了しますか？',
+      text: `「${unitName}」を終了し、過去の記録へ移動します。`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: '終了する',
+      cancelButtonText: 'キャンセル'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        showLoading();
+        runGoogleScript('archiveUnit', unitId)
+          .then(res => {
+            hideLoading();
+            if (res.success) {
+              Swal.fire('終了しました', '', 'success');
+              loadTeacherData();
+            } else {
+              showError(res.message);
+            }
+          })
+          .catch(err => {
+            hideLoading();
+            showError('単元のアーカイブに失敗しました。');
+          });
+      }
+    });
   }
 
   function renderTeacherTable(students) {
