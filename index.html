@@ -1,28 +1,31 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>スポ☆活ダッシュボード</title>
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
-  
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-  
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <?!= include('css'); ?>
 </head>
+
 <body>
 
   <!-- 全画面ローディングスピナー -->
   <div id="loading-overlay" class="d-flex justify-content-center align-items-center">
     <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-      <span class="visually-hidden"><ruby>読<rt>よ</rt></ruby>み<ruby>込<rt>こ</rt></ruby>み<ruby>中<rt>ちゅう</rt></ruby>...</span>
+      <span class="visually-hidden"><ruby>読<rt>よ</rt></ruby>み<ruby>込<rt>こ</rt></ruby>み<ruby>中<rt>ちゅう</rt>
+        </ruby>...</span>
     </div>
   </div>
 
@@ -37,7 +40,7 @@
 
     <!-- メインコンテンツ領域 -->
     <main id="app-container">
-      
+
       <!-- ========================================== -->
       <!-- 1. 初期設定画面 -->
       <!-- ========================================== -->
@@ -48,7 +51,8 @@
           <h2 class="h4 mb-3"><ruby>初期設定<rt>しょきせってい</rt></ruby>が<ruby>必要<rt>ひつよう</rt></ruby>です</h2>
           <p class="text-muted mb-4">
             データベースとなるスプレッドシートを<ruby>作成<rt>さくせい</rt></ruby>します。<br>
-            <ruby>最初<rt>さいしょ</rt></ruby>の<ruby>一回<rt>いっかい</rt></ruby>だけ、<ruby>先生<rt>せんせい</rt></ruby>が<ruby>実行<rt>じっこう</rt></ruby>してください。
+            <ruby>最初<rt>さいしょ</rt></ruby>の<ruby>一回<rt>いっかい</rt></ruby>だけ、<ruby>先生<rt>せんせい</rt></ruby>が<ruby>実行<rt>じっこう
+              </rt></ruby>してください。
           </p>
           <button id="btn-init" class="btn btn-primary btn-lg rounded-pill px-5">
             <i class="bi bi-magic"></i> <ruby>初期化<rt>しょきか</rt></ruby>を<ruby>実行<rt>じっこう</rt></ruby>する
@@ -61,7 +65,7 @@
       <!-- 2. 児童用画面 -->
       <!-- ========================================== -->
       <div id="student-view" class="d-none row g-4">
-        
+
         <!-- 左側：入力フォーム -->
         <div class="col-md-6">
           <div class="card shadow-sm border-0 rounded-3 h-100">
@@ -69,28 +73,49 @@
               <h5 class="card-title fw-bold mb-4 text-center">
                 <i class="bi bi-pencil-square text-primary"></i> <ruby>今日<rt>きょう</rt></ruby>の<ruby>記録<rt>きろく</rt></ruby>
               </h5>
-              
+
               <div class="mb-3 text-center">
                 <span id="current-unit-badge" class="badge bg-info text-dark fs-6 rounded-pill px-3 py-2"></span>
-                <button id="btn-view-ref" class="btn btn-outline-primary btn-sm rounded-pill ms-2 d-none" onclick="openReferenceModal()">
+                <button id="btn-view-ref" class="btn btn-outline-primary btn-sm rounded-pill ms-2 d-none"
+                  onclick="openReferenceModal()">
                   <i class="bi bi-image"></i> <ruby>お手本<rt>てほん</rt></ruby>を<ruby>見<rt>み</rt></ruby>る
                 </button>
+              </div>
+
+              <!-- 単元進捗バーと目標 -->
+              <div class="mb-4 bg-light p-3 rounded-3 text-center border">
+                <div class="d-flex justify-content-between text-muted small mb-1 fw-bold">
+                  <span>スタート</span>
+                  <span id="student-session-text">第-時 / 全-時間</span>
+                  <span>ゴール</span>
+                </div>
+                <div class="progress mb-2" style="height: 10px;">
+                  <div id="student-progress-bar"
+                    class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar"
+                    style="width: 0%"></div>
+                </div>
+                <div class="small fw-bold text-primary">
+                  <i class="bi bi-flag-fill"></i> 目標: <span id="student-unit-goal" class="text-dark">未設定</span>
+                </div>
               </div>
 
               <!-- 入力タイプ選択タブ -->
               <ul class="nav nav-pills nav-fill mb-4" id="inputTypeTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link active rounded-pill fw-bold" id="goal-tab" data-bs-toggle="pill" data-bs-target="#goal-form" type="button" role="tab">
+                  <button class="nav-link active rounded-pill fw-bold" id="goal-tab" data-bs-toggle="pill"
+                    data-bs-target="#goal-form" type="button" role="tab">
                     <ruby>事前目標<rt>じぜんもくひょう</rt></ruby>
                   </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link rounded-pill fw-bold" id="reflect-tab" data-bs-toggle="pill" data-bs-target="#reflect-form" type="button" role="tab">
+                  <button class="nav-link rounded-pill fw-bold" id="reflect-tab" data-bs-toggle="pill"
+                    data-bs-target="#reflect-form" type="button" role="tab">
                     <ruby>事後振<rt>じごふ</rt></ruby>り<ruby>返<rt>かえ</rt></ruby>り
                   </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link rounded-pill fw-bold text-success" id="thanks-tab" data-bs-toggle="pill" data-bs-target="#thanks-form" type="button" role="tab">
+                  <button class="nav-link rounded-pill fw-bold text-success" id="thanks-tab" data-bs-toggle="pill"
+                    data-bs-target="#thanks-form" type="button" role="tab">
                     <i class="bi bi-heart-fill"></i> ありがとう
                   </button>
                 </li>
@@ -100,17 +125,24 @@
                 <!-- 目標入力タブ -->
                 <div class="tab-pane fade show active" id="goal-form" role="tabpanel">
                   <div id="goal-alert" class="alert alert-success d-none" role="alert">
-                    <i class="bi bi-check-circle"></i> <ruby>今日<rt>きょう</rt></ruby>の<ruby>目標<rt>もくひょう</rt></ruby>は<ruby>入力済<rt>にゅうりょくず</rt></ruby>みです！
+                    <i class="bi bi-check-circle"></i> <ruby>今日<rt>きょう</rt></ruby>の<ruby>目標<rt>もくひょう</rt>
+                    </ruby>は<ruby>入力済<rt>にゅうりょくず</rt></ruby>みです！
                   </div>
                   <form id="form-goal" class="needs-validation" novalidate>
                     <div class="mb-3">
-                      <label class="form-label fw-bold"><ruby>今日<rt>きょう</rt></ruby>はどの<ruby>力<rt>ちから</rt></ruby>を<ruby>頑張<rt>がんば</rt></ruby>る？</label>
+                      <label class="form-label fw-bold"><ruby>今日<rt>きょう</rt></ruby>はどの<ruby>力<rt>ちから</rt>
+                        </ruby>を<ruby>頑張<rt>がんば</rt></ruby>る？</label>
                       <select class="form-select rounded-pill" id="goal-aspect" required>
                         <option value="" selected disabled><ruby>選<rt>えら</rt></ruby>んでください</option>
-                        <option value="知る"><ruby>知<rt>し</rt></ruby>る (<ruby>調<rt>しら</rt></ruby>べる・ルールを<ruby>覚<rt>おぼ</rt></ruby>える)</option>
-                        <option value="見る"><ruby>見<rt>み</rt></ruby>る (フォームを<ruby>確認<rt>かくにん</rt></ruby>する・<ruby>分析<rt>ぶんせき</rt></ruby>する)</option>
-                        <option value="する">する (たくさん<ruby>運動<rt>うんどう</rt></ruby>する・<ruby>挑戦<rt>ちょうせん</rt></ruby>する)</option>
-                        <option value="支える"><ruby>支<rt>ささ</rt></ruby>える (<ruby>友達<rt>ともだち</rt></ruby>にアドバイスする・<ruby>準備<rt>じゅんび</rt></ruby>する)</option>
+                        <option value="知る"><ruby>知<rt>し</rt></ruby>る (<ruby>調<rt>しら</rt></ruby>べる・ルールを<ruby>覚<rt>おぼ</rt>
+                          </ruby>える)</option>
+                        <option value="見る"><ruby>見<rt>み</rt></ruby>る (フォームを<ruby>確認<rt>かくにん</rt></ruby>する・<ruby>分析<rt>
+                              ぶんせき</rt></ruby>する)</option>
+                        <option value="する">する (たくさん<ruby>運動<rt>うんどう</rt></ruby>する・<ruby>挑戦<rt>ちょうせん</rt></ruby>する)
+                        </option>
+                        <option value="支える"><ruby>支<rt>ささ</rt></ruby>える (<ruby>友達<rt>ともだち</rt></ruby>にアドバイスする・<ruby>準備
+                            <rt>じゅんび</rt>
+                          </ruby>する)</option>
                       </select>
                     </div>
                     <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">
@@ -118,15 +150,17 @@
                     </button>
                   </form>
                 </div>
-                
+
                 <!-- 振り返り入力タブ -->
                 <div class="tab-pane fade" id="reflect-form" role="tabpanel">
                   <div id="reflect-alert" class="alert alert-success d-none" role="alert">
-                    <i class="bi bi-check-circle"></i> <ruby>今日<rt>きょう</rt></ruby>の<ruby>振<rt>ふ</rt></ruby>り<ruby>返<rt>かえ</rt></ruby>りは<ruby>入力済<rt>にゅうりょくず</rt></ruby>みです！
+                    <i class="bi bi-check-circle"></i> <ruby>今日<rt>きょう</rt></ruby>の<ruby>振<rt>ふ</rt></ruby>り<ruby>返<rt>
+                        かえ</rt></ruby>りは<ruby>入力済<rt>にゅうりょくず</rt></ruby>みです！
                   </div>
                   <form id="form-reflect" class="needs-validation" novalidate>
                     <div class="mb-3">
-                      <label class="form-label fw-bold">もっとも<ruby>発揮<rt>はっき</rt></ruby>できた<ruby>力<rt>ちから</rt></ruby>は？</label>
+                      <label class="form-label fw-bold">もっとも<ruby>発揮<rt>はっき</rt></ruby>できた<ruby>力<rt>ちから</rt>
+                        </ruby>は？</label>
                       <select class="form-select rounded-pill" id="reflect-aspect" required>
                         <option value="" selected disabled><ruby>選<rt>えら</rt></ruby>んでください</option>
                         <option value="知る"><ruby>知<rt>し</rt></ruby>る</option>
@@ -137,7 +171,8 @@
                     </div>
                     <div class="mb-3">
                       <label class="form-label fw-bold">ひとこと<ruby>振<rt>ふ</rt></ruby>り<ruby>返<rt>かえ</rt></ruby>り</label>
-                      <textarea class="form-control rounded-3" id="reflect-comment" rows="2" placeholder="どんなことをしたかな？" required></textarea>
+                      <textarea class="form-control rounded-3" id="reflect-comment" rows="2" placeholder="どんなことをしたかな？"
+                        required></textarea>
                     </div>
                     <button type="submit" class="btn btn-warning w-100 rounded-pill fw-bold text-dark">
                       <ruby>振<rt>ふ</rt></ruby>り<ruby>返<rt>かえ</rt></ruby>りを<ruby>送<rt>おく</rt></ruby>る！
@@ -156,7 +191,8 @@
                     </div>
                     <div class="mb-3">
                       <label class="form-label fw-bold">ありがとうのメッセージ</label>
-                      <textarea class="form-control rounded-3 border-success" id="thanks-comment" rows="2" placeholder="アドバイスありがとう！など" required></textarea>
+                      <textarea class="form-control rounded-3 border-success" id="thanks-comment" rows="2"
+                        placeholder="アドバイスありがとう！など" required></textarea>
                     </div>
                     <button type="submit" class="btn btn-success w-100 rounded-pill fw-bold">
                       <i class="bi bi-send-fill"></i> カードを<ruby>送<rt>おく</rt></ruby>る！
@@ -180,12 +216,13 @@
                 <canvas id="myRadarChart"></canvas>
               </div>
               <p class="text-muted small mt-3 text-center">
-                グラフが<ruby>小<rt>ちい</rt></ruby>さいところは、<ruby>次<rt>つぎ</rt></ruby>の<ruby>時間<rt>じかん</rt></ruby>に<ruby>意識<rt>いしき</rt></ruby>してみよう！
+                グラフが<ruby>小<rt>ちい</rt></ruby>さいところは、<ruby>次<rt>つぎ</rt></ruby>の<ruby>時間<rt>じかん</rt></ruby>に<ruby>意識<rt>
+                    いしき</rt></ruby>してみよう！
               </p>
             </div>
           </div>
         </div>
-        
+
         <!-- 下部：過去の履歴タイムライン -->
         <div class="col-12 mt-2">
           <div class="row g-4">
@@ -193,9 +230,16 @@
             <div class="col-md-6">
               <div class="card shadow-sm border-0 rounded-3 h-100">
                 <div class="card-body p-4">
-                  <h5 class="card-title fw-bold mb-3">
-                    <i class="bi bi-clock-history text-info"></i> これまでの<ruby>記録<rt>きろく</rt></ruby>
-                  </h5>
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title fw-bold m-0">
+                      <i class="bi bi-clock-history text-info"></i> これまでの<ruby>記録<rt>きろく</rt></ruby>
+                    </h5>
+                    <!-- 単元フィルタ -->
+                    <select id="history-filter" class="form-select form-select-sm w-auto rounded-pill"
+                      onchange="filterHistory()">
+                      <option value="all">すべて</option>
+                    </select>
+                  </div>
                   <div id="history-list" class="overflow-auto" style="max-height: 250px;">
                     <!-- JSで動的に追加 -->
                   </div>
@@ -204,7 +248,8 @@
             </div>
             <!-- もらったサンクスカード -->
             <div class="col-md-6">
-              <div class="card shadow-sm border-0 rounded-3 h-100 bg-success bg-opacity-10 border border-success border-opacity-25">
+              <div
+                class="card shadow-sm border-0 rounded-3 h-100 bg-success bg-opacity-10 border border-success border-opacity-25">
                 <div class="card-body p-4">
                   <h5 class="card-title fw-bold mb-3 text-success">
                     <i class="bi bi-envelope-heart-fill"></i> もらったサンクスカード
@@ -223,23 +268,35 @@
       <!-- 3. 教員用画面 (ダッシュボード) -->
       <!-- ========================================== -->
       <div id="teacher-view" class="d-none">
-        
+
         <!-- 単元名・お手本設定エリア -->
         <div class="card shadow-sm border-0 rounded-3 mb-4">
           <div class="card-body p-3 row g-3 align-items-center">
             <div class="col-md-6 d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <div class="d-flex align-items-center">
-                <span class="badge bg-primary fs-6 me-2"><ruby>現在<rt>げんざい</rt></ruby>の<ruby>単元<rt>たんげん</rt></ruby></span>
-                <span id="teacher-current-unit" class="fw-bold fs-5">取得中...</span>
+              <div class="d-flex flex-column">
+                <div class="d-flex align-items-center mb-1">
+                  <span class="badge bg-primary fs-6 me-2"><ruby>現在<rt>げんざい</rt></ruby>の<ruby>単元<rt>たんげん</rt>
+                    </ruby></span>
+                  <span id="teacher-current-unit" class="fw-bold fs-5">取得中...</span>
+                </div>
+                <div class="d-flex align-items-center">
+                  <span class="text-muted small me-2">全<span id="teacher-total-sessions">-</span>時間中</span>
+                  <div class="input-group input-group-sm" style="width: 120px;">
+                    <span class="input-group-text">第</span>
+                    <input type="number" id="teacher-current-session" class="form-control text-center" value="1"
+                      min="1">
+                    <span class="input-group-text">時</span>
+                  </div>
+                  <button class="btn btn-sm btn-outline-primary ms-2" onclick="changeSessionNumber()">更新</button>
+                </div>
               </div>
-              <div class="input-group" style="max-width: 250px;">
-                <input type="text" id="input-unit-name" class="form-control form-control-sm" placeholder="新しい単元名">
-                <button class="btn btn-outline-primary btn-sm" type="button" onclick="changeUnitName()">
-                  <i class="bi bi-pencil"></i> <ruby>変更<rt>へんこう</rt></ruby>
+              <div>
+                <button class="btn btn-primary btn-sm rounded-pill shadow-sm" onclick="openUnitManagerModal()">
+                  <i class="bi bi-gear-fill"></i> 単元マネージャー
                 </button>
               </div>
             </div>
-            
+
             <div class="col-md-6 d-flex justify-content-between align-items-center flex-wrap gap-2 border-start">
               <div class="d-flex align-items-center">
                 <span class="badge bg-info text-dark fs-6 me-2"><i class="bi bi-image"></i> お手本画像</span>
@@ -258,7 +315,8 @@
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
               <h5 class="card-title fw-bold m-0">
-                <i class="bi bi-people-fill text-primary"></i> <ruby>本日<rt>ほんじつ</rt></ruby>の<ruby>学習状況<rt>がくしゅうじょうきょう</rt></ruby>一覧
+                <i class="bi bi-people-fill text-primary"></i> <ruby>本日<rt>ほんじつ</rt></ruby>の<ruby>学習状況<rt>がくしゅうじょうきょう
+                  </rt></ruby>一覧
               </h5>
               <div>
                 <button class="btn btn-success btn-sm rounded-pill me-2" onclick="downloadCsv()">
@@ -269,7 +327,7 @@
                 </button>
               </div>
             </div>
-            
+
             <div class="table-responsive">
               <table class="table table-hover align-middle">
                 <thead class="table-light">
@@ -288,7 +346,8 @@
               </table>
             </div>
             <p class="text-muted small mt-2">
-              ※ <ruby>未入力<rt>みにゅうりょく</rt></ruby>の<ruby>児童<rt>じどう</rt></ruby>は<span class="text-danger fw-bold">赤文字</span>で<ruby>表示<rt>ひょうじ</rt></ruby>されます。
+              ※ <ruby>未入力<rt>みにゅうりょく</rt></ruby>の<ruby>児童<rt>じどう</rt></ruby>は<span
+                class="text-danger fw-bold">赤文字</span>で<ruby>表示<rt>ひょうじ</rt></ruby>されます。
             </p>
           </div>
         </div>
@@ -298,7 +357,8 @@
 
     <!-- 固定フッター -->
     <footer class="text-center text-muted py-3 mt-4 border-top">
-      <small>© 2026 スポ☆<ruby>活<rt>かつ</rt></ruby>ダッシュボード <a href="https://note.com/cute_borage86" target="_blank" class="text-decoration-none text-muted">GIGA<ruby>山<rt>やま</rt></ruby></a></small>
+      <small>© 2026 スポ☆<ruby>活<rt>かつ</rt></ruby>ダッシュボード <a href="https://note.com/cute_borage86" target="_blank"
+          class="text-decoration-none text-muted">GIGA<ruby>山<rt>やま</rt></ruby></a></small>
     </footer>
 
   </div>
@@ -308,7 +368,9 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header bg-light">
-          <h5 class="modal-title fw-bold text-primary"><i class="bi bi-image"></i> <ruby>今日<rt>きょう</rt></ruby>のお<ruby>手本<rt>てほん</rt></ruby></h5>
+          <h5 class="modal-title fw-bold text-primary"><i class="bi bi-image"></i> <ruby>今日<rt>きょう</rt></ruby>のお<ruby>手本
+              <rt>てほん</rt>
+            </ruby></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body text-center">
@@ -337,7 +399,8 @@
             <div class="col-md-5">
               <div class="card shadow-sm border-0 rounded-3 h-100">
                 <div class="card-body d-flex flex-column align-items-center">
-                  <h6 class="fw-bold text-center text-success"><i class="bi bi-radar"></i> <ruby>力<rt>ちから</rt></ruby>のバランス</h6>
+                  <h6 class="fw-bold text-center text-success"><i class="bi bi-radar"></i> <ruby>力<rt>ちから</rt>
+                    </ruby>のバランス</h6>
                   <div style="width: 100%; max-width: 250px;">
                     <canvas id="detailRadarChart"></canvas>
                   </div>
@@ -348,14 +411,16 @@
             <div class="col-md-7">
               <div class="card shadow-sm border-0 rounded-3 mb-3">
                 <div class="card-body">
-                  <h6 class="fw-bold text-info"><i class="bi bi-clock-history"></i> これまでの<ruby>記録<rt>きろく</rt></ruby></h6>
+                  <h6 class="fw-bold text-info"><i class="bi bi-clock-history"></i> これまでの<ruby>記録<rt>きろく</rt></ruby>
+                  </h6>
                   <div id="detail-history-list" class="overflow-auto pe-2" style="max-height: 250px;">
                     <!-- JSで動的に追加 -->
                   </div>
                 </div>
               </div>
-              
-              <div class="card shadow-sm border-0 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25">
+
+              <div
+                class="card shadow-sm border-0 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25">
                 <div class="card-body">
                   <h6 class="fw-bold text-success"><i class="bi bi-envelope-heart-fill"></i> もらったサンクスカード</h6>
                   <div id="detail-thanks-list" class="overflow-auto pe-2" style="max-height: 150px;">
@@ -368,13 +433,49 @@
         </div>
       </div>
     </div>
-  </div>
+    <!-- 単元マネージャーモーダル -->
+    <div class="modal fade" id="unitManagerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title fw-bold"><i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt></ruby>しい<ruby>単元<rt>
+                  たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby></h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-info small" role="alert">
+              <i class="bi bi-info-circle"></i> 新しい単元を作成すると、現在の単元はアーカイブされます（過去の記録として残ります）。
+            </div>
+            <form id="form-create-unit" class="needs-validation" novalidate>
+              <div class="mb-3">
+                <label class="form-label fw-bold">単元名</label>
+                <input type="text" class="form-control" id="new-unit-name" placeholder="例: 跳び箱運動" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold">総時間数（全何時間か）</label>
+                <input type="number" class="form-control" id="new-unit-sessions" value="6" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold">単元の大きな目標</label>
+                <textarea class="form-control" id="new-unit-goal" rows="2" placeholder="例: 自分にあった高さを選び、美しいフォームで跳ぼう"
+                  required></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+            <button type="button" class="btn btn-primary fw-bold" onclick="submitNewUnit()">単元を作成して開始する</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <!-- SweetAlert2 -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Bootstrap Bundle with Popper -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <?!= include('js'); ?>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <?!= include('js'); ?>
 </body>
+
 </html>

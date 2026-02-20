@@ -9,8 +9,9 @@ const PROPERTIES = PropertiesService.getScriptProperties();
 
 // ==== 定義（必須シートと必須列） ====
 const DEF_MEMBERS = ['メールアドレス', '出席番号', '氏名', '権限'];
-const DEF_LOGS = ['タイムスタンプ', 'メールアドレス', '単元名', '入力タイプ', '観点', 'コメント', 'deletedAt', '宛先'];
+const DEF_LOGS = ['タイムスタンプ', 'メールアドレス', '単元名', '入力タイプ', '観点', 'コメント', 'deletedAt', '宛先', '単元ID', '授業回'];
 const DEF_CONFIG = ['項目', '値'];
+const DEF_UNITS = ['単元ID', '単元名', '総時間数', '単元目標', '作成日時', 'ステータス']; // ステータス: active or archived
 
 // ==========================================
 // 自己修復 & ヘッダーマッピング機能 (Auto-Recovery)
@@ -34,16 +35,20 @@ function getHealthySpreadsheet() {
   const membersSheet = ensureSheet(ss, '名簿', DEF_MEMBERS);
   const logSheet = ensureSheet(ss, 'ログ', DEF_LOGS);
   const configSheet = ensureSheet(ss, '設定', DEF_CONFIG);
+  const unitSheet = ensureSheet(ss, '単元マスター', DEF_UNITS);
 
   // ヘッダー列の存在確認と動的マッピング
   const membersMap = ensureHeadersAndGetMap(membersSheet, DEF_MEMBERS);
   const logMap = ensureHeadersAndGetMap(logSheet, DEF_LOGS);
   const configMap = ensureHeadersAndGetMap(configSheet, DEF_CONFIG);
+  const unitMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
 
   // 設定シートの必須項目デフォルト値確保
-  ensureConfigDefault(configSheet, configMap, '現在の単元名', '体育');
+  ensureConfigDefault(configSheet, configMap, '現在の単元名', '未設定'); // 下位互換用
+  ensureConfigDefault(configSheet, configMap, '現在の単元ID', '');
+  ensureConfigDefault(configSheet, configMap, '現在の授業回', '1');
 
-  return { ss, membersSheet, membersMap, logSheet, logMap, configSheet, configMap };
+  return { ss, membersSheet, membersMap, logSheet, logMap, configSheet, configMap, unitSheet, unitMap };
 }
 
 /**
@@ -188,10 +193,34 @@ function getStudentData(email) {
   // 設定取得
   const configData = configSheet.getDataRange().getValues();
   let currentUnit = '未設定';
+  let currentUnitId = '';
+  let currentSession = '1';
   let refMediaId = '';
   for(let i = 1; i < configData.length; i++){
-    if(configData[i][configMap['項目']] === '現在の単元名') currentUnit = configData[i][configMap['値']];
-    if(configData[i][configMap['項目']] === 'お手本メディアID') refMediaId = configData[i][configMap['値']];
+    const k = configData[i][configMap['項目']];
+    const v = configData[i][configMap['値']];
+    if(k === '現在の単元名') currentUnit = v;
+    if(k === '現在の単元ID') currentUnitId = v;
+    if(k === '現在の授業回') currentSession = v;
+    if(k === 'お手本メディアID') refMediaId = v;
+  }
+
+  // 単元マスターから詳細情報取得
+  let totalSessions = '';
+  let unitGoal = '';
+  if (currentUnitId) {
+    const unitSheet = ss.getSheetByName('単元マスター');
+    if (unitSheet) {
+      const uData = unitSheet.getDataRange().getValues();
+      const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
+      for (let i = 1; i < uData.length; i++) {
+        if (uData[i][uMap['単元ID']] === currentUnitId) {
+          totalSessions = uData[i][uMap['総時間数']];
+          unitGoal = uData[i][uMap['単元目標']];
+          break;
+        }
+      }
+    }
   }
 
   // クラスメイト取得
@@ -228,7 +257,7 @@ function getStudentData(email) {
 
     // 空行や必須データがない行はスキップしてエラーを防ぐ
     if (!logEmail || !rawDate) continue; 
-    if (row[logMap['deletedAt']] !== "") continue; // 削除済み
+    if (row[logMap['deletedAt']]) continue; // 削除済み（空文字/null/undefined全対応）
 
     const type = row[logMap['入力タイプ']];
     const aspect = row[logMap['観点']];
@@ -273,6 +302,10 @@ function getStudentData(email) {
     hasTodayGoal: hasTodayGoal,
     hasTodayReflect: hasTodayReflect,
     currentUnit: currentUnit,
+    currentUnitId: currentUnitId,
+    currentSession: currentSession,
+    totalSessions: totalSessions,
+    unitGoal: unitGoal,
     classmates: classmates,
     refMediaId: refMediaId
   };
@@ -283,8 +316,14 @@ function saveLog(email, type, aspect, comment, targetEmail = "") {
   
   const configData = configSheet.getDataRange().getValues();
   let currentUnit = '未設定';
+  let currentUnitId = '';
+  let currentSession = '1';
   for(let i = 1; i < configData.length; i++){
-    if(configData[i][configMap['項目']] === '現在の単元名') currentUnit = configData[i][configMap['値']];
+    const k = configData[i][configMap['項目']];
+    const v = configData[i][configMap['値']];
+    if(k === '現在の単元名') currentUnit = v;
+    if(k === '現在の単元ID') currentUnitId = v;
+    if(k === '現在の授業回') currentSession = v;
   }
 
   // マッピングを使って正しく配列を組み立てる（列が入れ替わっていても対応）
@@ -298,6 +337,8 @@ function saveLog(email, type, aspect, comment, targetEmail = "") {
   newRow[logMap['観点']] = aspect;
   newRow[logMap['コメント']] = comment;
   newRow[logMap['deletedAt']] = "";
+  newRow[logMap['単元ID']] = currentUnitId;
+  newRow[logMap['授業回']] = currentSession;
   if (logMap['宛先'] !== undefined) {
     newRow[logMap['宛先']] = targetEmail;
   }
@@ -311,10 +352,32 @@ function getTeacherData() {
   
   const configData = configSheet.getDataRange().getValues();
   let currentUnit = '未設定';
+  let currentUnitId = '';
+  let currentSession = '1';
   let refMediaId = '';
   for(let i = 1; i < configData.length; i++){
-    if(configData[i][configMap['項目']] === '現在の単元名') currentUnit = configData[i][configMap['値']];
-    if(configData[i][configMap['項目']] === 'お手本メディアID') refMediaId = configData[i][configMap['値']];
+    const k = configData[i][configMap['項目']];
+    const v = configData[i][configMap['値']];
+    if(k === '現在の単元名') currentUnit = v;
+    if(k === '現在の単元ID') currentUnitId = v;
+    if(k === '現在の授業回') currentSession = v;
+    if(k === 'お手本メディアID') refMediaId = v;
+  }
+  
+  // 単元マスターから詳細情報取得
+  let totalSessions = '';
+  if (currentUnitId) {
+    const unitSheet = ss.getSheetByName('単元マスター');
+    if (unitSheet) {
+      const uData = unitSheet.getDataRange().getValues();
+      const uMap = ensureHeadersAndGetMap(unitSheet, DEF_UNITS);
+      for (let i = 1; i < uData.length; i++) {
+        if (uData[i][uMap['単元ID']] === currentUnitId) {
+          totalSessions = uData[i][uMap['総時間数']];
+          break;
+        }
+      }
+    }
   }
 
   const mData = membersSheet.getDataRange().getValues();
@@ -348,7 +411,7 @@ function getTeacherData() {
 
     // 空行スキップ
     if (!email || !rawDate) continue;
-    if (row[logMap['deletedAt']] !== "") continue;
+    if (row[logMap['deletedAt']]) continue; // 削除済み
     
     const type = row[logMap['入力タイプ']];
     const aspect = row[logMap['観点']];
@@ -382,8 +445,15 @@ function getTeacherData() {
     }
   });
   
-  students.sort((a, b) => parseInt(a.number) - parseInt(b.number));
-  return { students: students, currentUnit: currentUnit, refMediaId: refMediaId };
+  students.sort((a, b) => (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0));
+  return { 
+    students: students, 
+    currentUnit: currentUnit, 
+    currentUnitId: currentUnitId,
+    currentSession: currentSession,
+    totalSessions: totalSessions,
+    refMediaId: refMediaId 
+  };
 }
 
 function updateUnitName(newName) {
@@ -465,7 +535,7 @@ function getStudentDetailForTeacher(studentEmail) {
 
     // 空行スキップ
     if (!logEmail || !rawDate) continue;
-    if (row[logMap['deletedAt']] !== "") continue;
+    if (row[logMap['deletedAt']]) continue; // 削除済み
 
     const unit = row[logMap['単元名']];
     const type = row[logMap['入力タイプ']];
@@ -481,6 +551,7 @@ function getStudentDetailForTeacher(studentEmail) {
       logs.push({
         date: Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy/MM/dd"),
         unit: unit,
+        session: row[logMap['授業回']] || '',
         type: type,
         aspect: aspect,
         comment: comment
@@ -516,7 +587,7 @@ function getAllLogsForCsv() {
   }
 
   const lData = logSheet.getDataRange().getValues();
-  let csvData = [['タイムスタンプ', '氏名', '単元名', '入力タイプ', '観点', 'コメント', '宛先(サンクスカード)']];
+  let csvData = [['タイムスタンプ', '氏名', '単元名', '授業回', '入力タイプ', '観点', 'コメント', '宛先(サンクスカード)']];
   
   for (let i = 1; i < lData.length; i++) {
     const row = lData[i];
@@ -525,7 +596,7 @@ function getAllLogsForCsv() {
 
     // 空行スキップ
     if (!logEmail || !rawDate) continue;
-    if (row[logMap['deletedAt']] !== "") continue;
+    if (row[logMap['deletedAt']]) continue; // 削除済み
     
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) continue; // 不正な日付をスキップ
@@ -533,14 +604,73 @@ function getAllLogsForCsv() {
     const timestamp = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy/MM/dd HH:mm:ss");
     const name = emailToName[logEmail] || '不明';
     const unit = row[logMap['単元名']];
+    const session = row[logMap['授業回']] || '';
     const type = row[logMap['入力タイプ']];
     const aspect = row[logMap['観点']];
     const comment = row[logMap['コメント']];
     const targetEmail = logMap['宛先'] !== undefined ? row[logMap['宛先']] : "";
     const targetName = targetEmail ? (emailToName[targetEmail] || '不明') : '';
 
-    csvData.push([timestamp, name, unit, type, aspect, comment, targetName]);
+    csvData.push([timestamp, name, unit, session, type, aspect, comment, targetName]);
   }
   
   return csvData;
+}
+
+// ==========================================
+// 単元管理 API (Phase 1追加機能)
+// ==========================================
+
+function createUnit(unitName, totalSessions, unitGoal) {
+  const { ss, configSheet, configMap, unitSheet, unitMap } = getHealthySpreadsheet();
+  
+  // 重複チェックなどはせず単純に新規作成する
+  const newUnitId = 'U-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
+  
+  // 全既存単元をアーカイブ
+  const uData = unitSheet.getDataRange().getValues();
+  for (let i = 1; i < uData.length; i++) {
+    if (uData[i][unitMap['ステータス']] === 'active') {
+      unitSheet.getRange(i + 1, unitMap['ステータス'] + 1).setValue('archived');
+    }
+  }
+
+  // 新規単元の追加
+  let newRow = new Array(DEF_UNITS.length).fill('');
+  newRow[unitMap['単元ID']] = newUnitId;
+  newRow[unitMap['単元名']] = unitName;
+  newRow[unitMap['総時間数']] = totalSessions;
+  newRow[unitMap['単元目標']] = unitGoal;
+  newRow[unitMap['作成日時']] = new Date();
+  newRow[unitMap['ステータス']] = 'active';
+  unitSheet.appendRow(newRow);
+
+  // 設定シートの更新（古い「単元名」キーも一応塞いでおく）
+  updateConfigValue(configSheet, configMap, '現在の単元名', unitName);
+  updateConfigValue(configSheet, configMap, '現在の単元ID', newUnitId);
+  updateConfigValue(configSheet, configMap, '現在の授業回', '1');
+
+  return { success: true, newUnitId: newUnitId };
+}
+
+function updateSession(sessionNumber) {
+  const { configSheet, configMap } = getHealthySpreadsheet();
+  updateConfigValue(configSheet, configMap, '現在の授業回', sessionNumber.toString());
+  return { success: true, session: sessionNumber };
+}
+
+// 共通ヘルパー: 設定シートの特定キーを更新する
+function updateConfigValue(sheet, map, key, newValue) {
+  const data = sheet.getDataRange().getValues();
+  for(let i = 1; i < data.length; i++){
+    if(data[i][map['項目']] === key) {
+      sheet.getRange(i + 1, map['値'] + 1).setValue(newValue);
+      return;
+    }
+  }
+  // なければ追記
+  let newRow = [];
+  newRow[map['項目']] = key;
+  newRow[map['値']] = newValue;
+  sheet.appendRow(newRow);
 }

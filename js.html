@@ -4,6 +4,17 @@
   let currentRefBase64 = null; // 画像キャッシュ用
   let detailRadarChartInst = null; // 教員用カルテのチャートインスタンス
 
+  // ==== XSS対策: HTMLエスケープ ====
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // ==== 起動時の処理 ====
   document.addEventListener('DOMContentLoaded', () => {
     const btnInit = document.getElementById('btn-init');
@@ -23,7 +34,7 @@
         currentUser = user;
         document.getElementById('user-info-badge').textContent = `${user.number} ${user.name}`;
         document.getElementById('user-info-badge').classList.remove('d-none');
-        
+
         if (user.role === 'teacher') {
           document.getElementById('teacher-view').classList.remove('d-none');
           loadTeacherData();
@@ -53,7 +64,7 @@
             confirmButtonText: 'OK',
             confirmButtonColor: '#1a73e8'
           }).then(() => {
-            window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>"; 
+            window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>";
           });
         } else {
           showError(res.error);
@@ -65,22 +76,33 @@
       });
   }
 
+  let studentAllLogs = []; // フィルタリング用に元の配列を保持
+
   // ==== 児童用画面ロジック ====
   function loadStudentData() {
     showLoading();
     runGoogleScript('getStudentData', currentUser.email)
       .then(data => {
         hideLoading();
-        
+
         document.getElementById('current-unit-badge').textContent = `現在の単元：${data.currentUnit}`;
-        
+
+        // 進捗プログレスバーの計算と描画
+        const curSession = parseInt(data.currentSession, 10) || 1;
+        const totSessions = parseInt(data.totalSessions, 10) || 1;
+        document.getElementById('student-session-text').textContent = `第${curSession}時 / 全${totSessions}時間`;
+        document.getElementById('student-unit-goal').textContent = data.unitGoal || "未設定";
+
+        const progressPct = Math.min(100, Math.round((curSession / totSessions) * 100));
+        document.getElementById('student-progress-bar').style.width = `${progressPct}%`;
+
         const btnRef = document.getElementById('btn-view-ref');
         if (data.refMediaId) {
           btnRef.classList.remove('d-none');
         } else {
           btnRef.classList.add('d-none');
         }
-        
+
         const targetSelect = document.getElementById('thanks-target');
         targetSelect.innerHTML = '<option value="" selected disabled>選んでください</option>';
         data.classmates.forEach(c => {
@@ -91,14 +113,19 @@
         });
 
         drawRadarChart(data.radarData);
-        renderHistory(data.logs);
+
+        // 履歴を保持してフィルタUIを構築
+        studentAllLogs = data.logs;
+        buildHistoryFilter(data.currentUnit);
+        filterHistory(); // 初期描画
+
         renderReceivedThanks(data.receivedThanks);
-        
-        if(data.hasTodayGoal) {
+
+        if (data.hasTodayGoal) {
           document.getElementById('goal-alert').classList.remove('d-none');
           document.getElementById('form-goal').classList.add('d-none');
         }
-        if(data.hasTodayReflect) {
+        if (data.hasTodayReflect) {
           document.getElementById('reflect-alert').classList.remove('d-none');
           document.getElementById('form-reflect').classList.add('d-none');
         }
@@ -113,27 +140,39 @@
     const goalForm = document.getElementById('form-goal');
     goalForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!goalForm.checkValidity()) {
+        goalForm.classList.add('was-validated');
+        return;
+      }
       const aspect = document.getElementById('goal-aspect').value;
-      if(!aspect) return;
+      if (!aspect) return;
       submitLog('事前目標', aspect, '');
     });
 
     const reflectForm = document.getElementById('form-reflect');
     reflectForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!reflectForm.checkValidity()) {
+        reflectForm.classList.add('was-validated');
+        return;
+      }
       const aspect = document.getElementById('reflect-aspect').value;
       const comment = document.getElementById('reflect-comment').value;
-      if(!aspect || !comment) return;
+      if (!aspect || !comment) return;
       submitLog('事後振り返り', aspect, comment);
     });
 
     const thanksForm = document.getElementById('form-thanks');
     thanksForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!thanksForm.checkValidity()) {
+        thanksForm.classList.add('was-validated');
+        return;
+      }
       const targetEmail = document.getElementById('thanks-target').value;
       const comment = document.getElementById('thanks-comment').value;
-      if(!targetEmail || !comment) return;
-      
+      if (!targetEmail || !comment) return;
+
       showLoading();
       runGoogleScript('saveLog', currentUser.email, 'サンクスカード', '支える', comment, targetEmail)
         .then(res => {
@@ -144,8 +183,9 @@
             confirmButtonColor: '#28a745'
           });
           document.getElementById('thanks-comment').value = '';
-          document.getElementById('thanks-target').value = '';
-          loadStudentData(); 
+          document.getElementById('thanks-target').selectedIndex = 0; // 正しくdisabledオプションに戻す
+          thanksForm.classList.remove('was-validated');
+          loadStudentData();
         })
         .catch(err => {
           hideLoading();
@@ -173,7 +213,7 @@
   function drawRadarChart(dataArray) {
     const ctx = document.getElementById('myRadarChart').getContext('2d');
     if (myRadarChart) myRadarChart.destroy();
-    
+
     myRadarChart = new Chart(ctx, {
       type: 'radar',
       data: {
@@ -181,7 +221,7 @@
         datasets: [{
           label: 'えらんだ回数',
           data: dataArray,
-          backgroundColor: 'rgba(26, 115, 232, 0.2)', 
+          backgroundColor: 'rgba(26, 115, 232, 0.2)',
           borderColor: 'rgba(26, 115, 232, 1)',
           pointBackgroundColor: 'rgba(26, 115, 232, 1)',
           borderWidth: 2
@@ -208,13 +248,49 @@
       div.className = 'border-bottom py-2 mb-2';
       div.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <small class="text-muted fw-bold">${log.date} ${icon} ${log.type}</small>
+          <small class="text-muted fw-bold">${escapeHtml(log.date)} ${icon} ${escapeHtml(log.type)}</small>
           ${getAspectBadge(log.aspect)}
         </div>
-        ${isReflect ? `<div class="small bg-light p-2 rounded mt-1">${log.comment}</div>` : ''}
+        ${isReflect ? `<div class="small bg-light p-2 rounded mt-1">${escapeHtml(log.comment)}</div>` : ''}
       `;
       container.appendChild(div);
     });
+  }
+
+  // ==== 履歴フィルタリング機能 ====
+  function buildHistoryFilter(currentUnit) {
+    const filterSelect = document.getElementById('history-filter');
+    filterSelect.innerHTML = `<option value="all">すべて表示</option>`;
+
+    // ログから存在する単元名を抽出して重複排除（今の単元を上へ）
+    let units = [...new Set(studentAllLogs.map(l => l.unit))];
+    if (units.includes(currentUnit)) {
+      units = units.filter(u => u !== currentUnit);
+      units.unshift(currentUnit);
+    }
+
+    units.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u === currentUnit ? `[今] ${u}` : u;
+      filterSelect.appendChild(opt);
+    });
+
+    // 初期は「今の単元」を選択させる（存在すれば）
+    if (units.length > 0 && currentUnit !== '未設定') {
+      filterSelect.value = currentUnit;
+    }
+  }
+
+  function filterHistory() {
+    const filterVal = document.getElementById('history-filter').value;
+    let filteredLogs = studentAllLogs;
+
+    if (filterVal !== 'all') {
+      filteredLogs = studentAllLogs.filter(l => l.unit === filterVal);
+    }
+
+    renderHistory(filteredLogs);
   }
 
   function renderReceivedThanks(thanksData) {
@@ -229,11 +305,11 @@
       div.className = 'border-bottom py-2 mb-2';
       div.innerHTML = `
         <div class="d-flex align-items-center mb-1">
-          <span class="badge bg-success me-2"><i class="bi bi-gift-fill"></i> From: ${card.senderName}</span>
-          <small class="text-muted fw-bold">${card.date}</small>
+          <span class="badge bg-success me-2"><i class="bi bi-gift-fill"></i> From: ${escapeHtml(card.senderName)}</span>
+          <small class="text-muted fw-bold">${escapeHtml(card.date)}</small>
         </div>
         <div class="small bg-white p-2 rounded mt-1 border border-success border-opacity-25">
-          ${card.comment}
+          ${escapeHtml(card.comment)}
         </div>
       `;
       container.appendChild(div);
@@ -245,7 +321,7 @@
     const imgEl = document.getElementById('reference-image');
     const loadingEl = document.getElementById('ref-loading');
     const modal = new bootstrap.Modal(document.getElementById('referenceModal'));
-    
+
     modal.show();
 
     if (currentRefBase64) {
@@ -255,10 +331,10 @@
     } else {
       loadingEl.classList.remove('d-none');
       imgEl.classList.add('d-none');
-      
+
       runGoogleScript('getReferenceImageBase64')
         .then(base64 => {
-          currentRefBase64 = base64; 
+          currentRefBase64 = base64;
           loadingEl.classList.add('d-none');
           imgEl.src = base64;
           imgEl.classList.remove('d-none');
@@ -278,7 +354,10 @@
       .then(data => {
         hideLoading();
         document.getElementById('teacher-current-unit').textContent = data.currentUnit;
-        if(data.refMediaId) {
+        document.getElementById('teacher-total-sessions').textContent = data.totalSessions || '-';
+        document.getElementById('teacher-current-session').value = data.currentSession || 1;
+
+        if (data.refMediaId) {
           document.getElementById('input-ref-id').value = data.refMediaId;
         }
         renderTeacherTable(data.students);
@@ -289,37 +368,70 @@
       });
   }
 
-  function changeUnitName() {
-    const newName = document.getElementById('input-unit-name').value.trim();
-    if (!newName) return;
-    
+  // ==== 単元マネージャー関連 ====
+  function openUnitManagerModal() {
+    document.getElementById('form-create-unit').reset();
+    document.getElementById('form-create-unit').classList.remove('was-validated');
+    const modal = new bootstrap.Modal(document.getElementById('unitManagerModal'));
+    modal.show();
+  }
+
+  function submitNewUnit() {
+    const form = document.getElementById('form-create-unit');
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const uName = document.getElementById('new-unit-name').value;
+    const uSessions = document.getElementById('new-unit-sessions').value;
+    const uGoal = document.getElementById('new-unit-goal').value;
+
     showLoading();
-    runGoogleScript('updateUnitName', newName)
+    bootstrap.Modal.getInstance(document.getElementById('unitManagerModal')).hide();
+
+    runGoogleScript('createUnit', uName, uSessions, uGoal)
       .then(res => {
-        hideLoading();
-        if(res.success) {
-          document.getElementById('teacher-current-unit').textContent = res.newUnit;
-          document.getElementById('input-unit-name').value = '';
-          Swal.fire({icon: 'success', title: '単元名を変更しました', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000});
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: '新しい単元を開始しました', confirmButtonColor: '#1a73e8' });
+          loadTeacherData(); // 再読み込み
         }
       })
       .catch(err => {
         hideLoading();
-        showError('単元名の変更に失敗しました。');
+        showError('単元の作成に失敗しました。');
+      });
+  }
+
+  function changeSessionNumber() {
+    const newSession = document.getElementById('teacher-current-session').value;
+    if (!newSession || newSession < 1) return;
+
+    showLoading();
+    runGoogleScript('updateSession', newSession)
+      .then(res => {
+        hideLoading();
+        if (res.success) {
+          Swal.fire({ icon: 'success', title: `第${res.session}時に変更しました`, toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        showError('授業回の更新に失敗しました。');
       });
   }
 
   function changeRefMediaId() {
     const newId = document.getElementById('input-ref-id').value.trim();
     if (!newId) return;
-    
+
     showLoading();
     runGoogleScript('updateRefMediaId', newId)
       .then(res => {
         hideLoading();
-        if(res.success) {
-          currentRefBase64 = null; 
-          Swal.fire({icon: 'success', title: 'お手本画像を設定しました', text: '児童の画面に「お手本を見る」ボタンが表示されます', confirmButtonColor: '#17a2b8'});
+        if (res.success) {
+          currentRefBase64 = null;
+          Swal.fire({ icon: 'success', title: 'お手本画像を設定しました', text: '児童の画面に「お手本を見る」ボタンが表示されます', confirmButtonColor: '#17a2b8' });
         }
       })
       .catch(err => {
@@ -331,29 +443,29 @@
   function renderTeacherTable(students) {
     const tbody = document.getElementById('teacher-tbody');
     tbody.innerHTML = '';
-    
+
     students.forEach(s => {
       const tr = document.createElement('tr');
-      
+
       const isGoalMissing = s.todayGoalAspect === '未';
       const isReflectMissing = s.todayReflectAspect === '未';
-      
+
       if (isGoalMissing || isReflectMissing) {
-        tr.classList.add('alert-row'); 
+        tr.classList.add('alert-row');
       }
-      
+
       const goalHtml = isGoalMissing ? `<span class="missing-text"><ruby>未入力<rt>みにゅうりょく</rt></ruby></span>` : getAspectBadge(s.todayGoalAspect);
       const reflectHtml = isReflectMissing ? `<span class="missing-text"><ruby>未入力<rt>みにゅうりょく</rt></ruby></span>` : getAspectBadge(s.todayReflectAspect);
       const biasAlertHtml = s.alertBias ? `<span class="badge bg-danger ms-1" title="${s.alertBias}ばかり選んでいます"><i class="bi bi-exclamation-triangle"></i> 偏り</span>` : '';
 
       tr.innerHTML = `
-        <td>${s.number}</td>
-        <td class="fw-bold">${s.name} ${biasAlertHtml}</td>
+        <td>${escapeHtml(s.number)}</td>
+        <td class="fw-bold">${escapeHtml(s.name)} ${biasAlertHtml}</td>
         <td>${goalHtml}</td>
         <td>${reflectHtml}</td>
-        <td class="small text-muted text-truncate" style="max-width: 150px;">${s.todayReflectComment || '-'}</td>
+        <td class="small text-muted text-truncate" style="max-width: 150px;">${escapeHtml(s.todayReflectComment) || '-'}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="openStudentDetail('${s.email}')">
+          <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="openStudentDetail('${escapeHtml(s.email)}')">
             <i class="bi bi-search"></i> カルテ
           </button>
         </td>
@@ -364,10 +476,10 @@
 
   function getAspectBadge(aspect) {
     let className = 'bg-secondary';
-    if(aspect === '知る') className = 'badge-shiru';
-    if(aspect === '見る') className = 'badge-miru';
-    if(aspect === 'する') className = 'badge-suru';
-    if(aspect === '支える') className = 'badge-sasaeru';
+    if (aspect === '知る') className = 'badge-shiru';
+    if (aspect === '見る') className = 'badge-miru';
+    if (aspect === 'する') className = 'badge-suru';
+    if (aspect === '支える') className = 'badge-sasaeru';
     return `<span class="badge ${className} rounded-pill">${aspect}</span>`;
   }
 
@@ -378,10 +490,10 @@
       .then(data => {
         hideLoading();
         document.getElementById('detail-student-name').textContent = data.name;
-        
+
         const ctx = document.getElementById('detailRadarChart').getContext('2d');
         if (detailRadarChartInst) detailRadarChartInst.destroy();
-        
+
         detailRadarChartInst = new Chart(ctx, {
           type: 'radar',
           data: {
@@ -413,10 +525,10 @@
             div.className = 'border-bottom py-2 mb-2';
             div.innerHTML = `
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <small class="text-muted fw-bold">${log.date} <span class="badge bg-light text-dark border">${log.unit}</span> ${icon} ${log.type}</small>
+                <small class="text-muted fw-bold">${escapeHtml(log.date)} <span class="badge bg-light text-dark border">${escapeHtml(log.unit)}</span> ${icon} ${escapeHtml(log.type)}</small>
                 ${getAspectBadge(log.aspect)}
               </div>
-              ${isReflect ? `<div class="small bg-white p-2 rounded mt-1 border">${log.comment}</div>` : ''}
+              ${isReflect ? `<div class="small bg-white p-2 rounded mt-1 border">${escapeHtml(log.comment)}</div>` : ''}
             `;
             historyContainer.appendChild(div);
           });
@@ -432,18 +544,28 @@
             div.className = 'border-bottom py-2 mb-2';
             div.innerHTML = `
               <div class="d-flex align-items-center mb-1">
-                <span class="badge bg-success me-2"><i class="bi bi-gift-fill"></i> From: ${card.senderName}</span>
-                <small class="text-muted fw-bold">${card.date}</small>
+                <span class="badge bg-success me-2"><i class="bi bi-gift-fill"></i> From: ${escapeHtml(card.senderName)}</span>
+                <small class="text-muted fw-bold">${escapeHtml(card.date)}</small>
               </div>
               <div class="small bg-white p-2 rounded mt-1 border border-success border-opacity-25">
-                ${card.comment}
+                ${escapeHtml(card.comment)}
               </div>
             `;
             thanksContainer.appendChild(div);
           });
         }
 
-        const modal = new bootstrap.Modal(document.getElementById('studentDetailModal'));
+        const modalEl = document.getElementById('studentDetailModal');
+        // モーダル閉じた時にChartインスタンスを破棄してメモリリーク防止
+        modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+          if (detailRadarChartInst) {
+            detailRadarChartInst.destroy();
+            detailRadarChartInst = null;
+          }
+          modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        }, { once: true });
+
+        const modal = new bootstrap.Modal(modalEl);
         modal.show();
       })
       .catch(err => {
@@ -469,12 +591,12 @@
         runGoogleScript('getAllLogsForCsv')
           .then(dataArray => {
             hideLoading();
-            let csvContent = "\uFEFF"; 
-            
+            let csvContent = "\uFEFF";
+
             dataArray.forEach(row => {
               let rowStr = row.map(item => {
                 let str = String(item || '');
-                str = str.replace(/"/g, '""'); 
+                str = str.replace(/"/g, '""');
                 if (str.includes(',') || str.includes('\n') || str.includes('"')) {
                   str = `"${str}"`;
                 }
@@ -492,6 +614,7 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url); // メモリリーク防止
           })
           .catch(err => {
             hideLoading();
@@ -515,13 +638,13 @@
         .withFailureHandler((error) => {
           if (attempt < MAX_RETRIES) {
             console.warn(`[Retry ${attempt}/${MAX_RETRIES}] ${funcName} failed. Retrying in ${attempt * 1000}ms...`);
-            setTimeout(() => execute(resolve, reject), attempt * 1000); 
+            setTimeout(() => execute(resolve, reject), attempt * 1000);
           } else {
             console.error(`[Error] ${funcName} failed after ${MAX_RETRIES} attempts.`, error);
             reject(error);
           }
         })
-        [funcName](...args);
+      [funcName](...args);
     };
 
     return new Promise(execute);
@@ -530,11 +653,19 @@
   function showLoading() {
     document.getElementById('loading-overlay').classList.remove('d-none');
     document.getElementById('loading-overlay').style.display = 'flex';
+    // ボタン連打防止: 全送信ボタンを無効化
+    document.querySelectorAll('button[type="submit"], .btn-primary, .btn-warning, .btn-success, .btn-outline-primary').forEach(btn => {
+      btn.disabled = true;
+    });
   }
 
   function hideLoading() {
     document.getElementById('loading-overlay').classList.add('d-none');
     document.getElementById('loading-overlay').style.display = 'none';
+    // ボタン復帰
+    document.querySelectorAll('button[type="submit"], .btn-primary, .btn-warning, .btn-success, .btn-outline-primary').forEach(btn => {
+      btn.disabled = false;
+    });
   }
 
   function showError(message) {
