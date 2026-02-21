@@ -141,7 +141,8 @@ function doGet(e) {
   template.isSetup = !ssId;
   return template.evaluate()
     .setTitle(APP_NAME)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setFaviconUrl('https://drive.google.com/uc?id=1g7PlclDf5CynFyHrBCBI9yZD_xqSChYn&.png');
 }
 
 function include(filename) {
