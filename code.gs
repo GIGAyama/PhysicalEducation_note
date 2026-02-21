@@ -543,19 +543,17 @@ function updateRefMediaId(newId) {
   return {success: true, newId: newId};
 }
 
-function getReferenceImageBase64() {
-  const { configSheet, configMap } = getHealthySpreadsheet();
-  const data = configSheet.getDataRange().getValues();
-  let fileId = '';
-  for(let i = 1; i < data.length; i++){
-    if(data[i][configMap['項目']] === 'お手本メディアID') fileId = data[i][configMap['値']];
-  }
-  if (!fileId) throw new Error('お手本画像が設定されていません。');
+function getReferenceImageBase64(fileId) {
+  if (!fileId) throw new Error('ファイルIDが指定されていません。');
   
-  const file = DriveApp.getFileById(fileId);
-  const blob = file.getBlob();
-  // 拡張子によらずBase64テキスト化することでCORS等のブロックを回避
-  return "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes());
+  try {
+    const file = DriveApp.getFileById(fileId);
+    const blob = file.getBlob();
+    // Base64テキスト化することでCORS等のブロックを回避
+    return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    throw new Error('ファイルを取得できませんでした。共有権限を確認してください: ' + e.message);
+  }
 }
 
 function getStudentDetailForTeacher(studentEmail) {
