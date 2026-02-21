@@ -375,34 +375,22 @@ function getStudentData(email) {
   };
 }
 
-function saveLog(email, type, aspect, comment, targetEmail = "") {
-  const { logSheet, logMap, configSheet, configMap } = getHealthySpreadsheet();
+function saveLog(email, type, aspect, comment, targetEmail = "", selectedUnitName = "", selectedUnitId = "", selectedSession = "") {
+  const { logSheet, logMap } = getHealthySpreadsheet();
   
-  const configData = configSheet.getDataRange().getValues();
-  let currentUnit = '未設定';
-  let currentUnitId = '';
-  let currentSession = '1';
-  for(let i = 1; i < configData.length; i++){
-    const k = configData[i][configMap['項目']];
-    const v = configData[i][configMap['値']];
-    if(k === '現在の単元名') currentUnit = v;
-    if(k === '現在の単元ID') currentUnitId = v;
-    if(k === '現在の授業回') currentSession = v;
-  }
-
   // マッピングを使って正しく配列を組み立てる（列が入れ替わっていても対応）
   const maxCol = Math.max(...Object.values(logMap)) + 1;
   let newRow = new Array(maxCol).fill("");
   
   newRow[logMap['タイムスタンプ']] = new Date();
-  newRow[logMap['メールアドレス']] = email;
-  newRow[logMap['単元名']] = currentUnit;
+  newRow[logMap['メールアドレス']] = String(email).trim();
+  newRow[logMap['単元名']] = selectedUnitName || '未設定';
   newRow[logMap['入力タイプ']] = type;
   newRow[logMap['観点']] = aspect;
   newRow[logMap['コメント']] = comment;
   newRow[logMap['deletedAt']] = "";
-  newRow[logMap['単元ID']] = currentUnitId;
-  newRow[logMap['授業回']] = currentSession;
+  newRow[logMap['単元ID']] = selectedUnitId || '';
+  newRow[logMap['授業回']] = selectedSession || '';
   if (logMap['宛先'] !== undefined) {
     newRow[logMap['宛先']] = targetEmail;
   }
@@ -597,13 +585,16 @@ function getStudentDetailForTeacher(studentEmail) {
   
   let studentName = '不明な児童';
   let emailToName = {};
+  const targetEmail = String(studentEmail).trim();
+
   for (let i = 1; i < mData.length; i++) {
     let email = mData[i][membersMap['メールアドレス']];
     if (!email) continue; // 空行スキップ
 
+    let cleanEmail = String(email).trim();
     let name = mData[i][membersMap['氏名']];
-    emailToName[email] = name;
-    if (email === studentEmail) studentName = name;
+    emailToName[cleanEmail] = name;
+    if (cleanEmail === targetEmail) studentName = name;
   }
 
   let radarCounts = { '知る': 0, '見る': 0, 'する': 0, '支える': 0 };
@@ -612,7 +603,7 @@ function getStudentDetailForTeacher(studentEmail) {
 
   for (let i = 1; i < logData.length; i++) {
     const row = logData[i];
-    const logEmail = row[logMap['メールアドレス']];
+    const logEmail = String(row[logMap['メールアドレス']] || "").trim();
     const rawDate = row[logMap['タイムスタンプ']];
 
     // 空行スキップ
@@ -623,12 +614,12 @@ function getStudentDetailForTeacher(studentEmail) {
     const type = row[logMap['入力タイプ']];
     const aspect = row[logMap['観点']];
     const comment = row[logMap['コメント']];
-    const targetEmail = logMap['宛先'] !== undefined ? (row[logMap['宛先']] || "") : "";
+    const targetThanksEmail = logMap['宛先'] !== undefined ? String(row[logMap['宛先']] || "").trim() : "";
     
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) continue; // 不正な日付をスキップ
 
-    if (logEmail === studentEmail && type !== 'サンクスカード') {
+    if (logEmail === targetEmail && type !== 'サンクスカード') {
       if (aspect in radarCounts) radarCounts[aspect]++;
       logs.push({
         date: Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy/MM/dd"),
@@ -640,7 +631,7 @@ function getStudentDetailForTeacher(studentEmail) {
       });
     }
 
-    if (type === 'サンクスカード' && targetEmail === studentEmail) {
+    if (type === 'サンクスカード' && targetThanksEmail === targetEmail) {
       receivedThanks.push({
         date: Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "yyyy/MM/dd"),
         senderName: emailToName[logEmail] || '友達',
