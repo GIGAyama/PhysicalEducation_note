@@ -612,23 +612,105 @@
 
       const div = document.createElement('div');
       div.className = 'mb-3 pb-3 border-bottom';
+      const mediaInputId = 'session-media-' + i;
       div.innerHTML = `
         <div class="fw-bold text-secondary mb-2">第${i}時</div>
-        <div class="row g-2">
-          <div class="col-md-7">
-            <input type="text" class="form-control form-control-sm session-goal-input" data-session="${i}" placeholder="この時間のめあて" value="${escapeHtml(prefGoal)}" required>
-            <div class="invalid-feedback">入力は必須です</div>
-          </div>
-          <div class="col-md-5">
-            <div class="input-group input-group-sm">
-              <span class="input-group-text"><i class="bi bi-image"></i></span>
-              <input type="text" class="form-control session-media-input" data-session="${i}" placeholder="画像やスライドのURLを貼り付け(任意)" value="${escapeHtml(prefMedia)}">
-            </div>
-          </div>
+        <div class="mb-2">
+          <input type="text" class="form-control form-control-sm session-goal-input" data-session="${i}" placeholder="この時間のめあて" value="${escapeHtml(prefGoal)}" required>
+          <div class="invalid-feedback">入力は必須です</div>
+        </div>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-image"></i></span>
+          <input type="text" class="form-control session-media-input" id="${mediaInputId}" data-session="${i}" placeholder="URL貼り付け または Driveから選択" value="${escapeHtml(prefMedia)}">
+          <button type="button" class="btn btn-outline-warning btn-sm" onclick="openDrivePicker('${mediaInputId}')" title="Driveから選ぶ">
+            <i class="bi bi-folder2-open"></i>
+          </button>
         </div>
       `;
       container.appendChild(div);
     }
+  }
+
+  // ==== Driveファイルピッカー ====
+  let drivePickerTargetId = null;   // 選択後に値をセットする入力欄のID
+  let driveFilesCache = null;       // 返り値をキャッシュする（モーダル開くたびにAPIを叁らないため）
+
+  function openDrivePicker(inputId) {
+    drivePickerTargetId = inputId;
+    const modal = new bootstrap.Modal(document.getElementById('drivePickerModal'));
+    modal.show();
+
+    if (driveFilesCache && driveFilesCache.length > 0) {
+      // キャッシュがあれまた好もなすぐ描画
+      renderDriveFiles(driveFilesCache);
+    } else {
+      document.getElementById('drive-file-list').innerHTML =
+        '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div> 読み込み中...</div>';
+
+      runGoogleScript('listMediaFiles')
+        .then(function (res) {
+          if (res.success) {
+            driveFilesCache = res.files;
+            // フォルダへのリンクを設定
+            var folderLink = document.getElementById('drive-folder-link');
+            folderLink.href = 'https://drive.google.com/drive/folders/' + res.folderId;
+            renderDriveFiles(driveFilesCache);
+          } else {
+            document.getElementById('drive-file-list').innerHTML =
+              '<div class="alert alert-danger small">フォルダの内容を取得できませんでした。</div>';
+          }
+        })
+        .catch(function () {
+          document.getElementById('drive-file-list').innerHTML =
+            '<div class="alert alert-danger small">通信エラーが発生しました。</div>';
+        });
+    }
+
+    // 検索ボックスの初期化
+    var searchBox = document.getElementById('drive-search-box');
+    searchBox.value = '';
+    searchBox.oninput = function () {
+      if (driveFilesCache) renderDriveFiles(driveFilesCache);
+    };
+  }
+
+  function renderDriveFiles(files) {
+    var query = (document.getElementById('drive-search-box').value || '').toLowerCase();
+    var filtered = files.filter(function (f) { return f.name.toLowerCase().indexOf(query) !== -1; });
+    var container = document.getElementById('drive-file-list');
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="text-muted text-center py-4">該当するファイルがありません。</div>';
+      return;
+    }
+
+    var html = '<div class="list-group list-group-flush">';
+    filtered.forEach(function (f) {
+      var icon = f.type === 'slide' ? 'bi-file-earmark-slides text-warning'
+        : f.type === 'image' ? 'bi-file-earmark-image text-info'
+          : f.type === 'video' ? 'bi-file-earmark-play text-danger'
+            : 'bi-file-earmark text-secondary';
+      var typeLabel = f.type === 'slide' ? 'スライド'
+        : f.type === 'image' ? '画像'
+          : f.type === 'video' ? '動画' : 'その他';
+      html += '<button type="button" class="list-group-item list-group-item-action py-2 px-3"' +
+        ' onclick="selectDriveFile(\'' + escapeHtml(f.url) + '\', \'' + escapeHtml(f.name) + '\')">'
+        + '<i class="bi ' + icon + ' me-2"></i>'
+        + '<span class="me-2">' + escapeHtml(f.name) + '</span>'
+        + '<span class="badge bg-secondary float-end">' + typeLabel + '</span>'
+        + '</button>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  function selectDriveFile(url, name) {
+    if (!drivePickerTargetId) return;
+    var input = document.getElementById(drivePickerTargetId);
+    if (input) input.value = url;
+    // モーダルを閉じる
+    bootstrap.Modal.getInstance(document.getElementById('drivePickerModal')).hide();
+    drivePickerTargetId = null;
   }
 
   function submitUnit() {

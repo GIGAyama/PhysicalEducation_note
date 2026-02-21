@@ -156,6 +156,9 @@ function initializeSetup() {
     // getHealthySpreadsheetを呼び出すことで自動的に必要な全シートとヘッダーが生成される
     getHealthySpreadsheet();
     
+    // お手本フォルダも同時に作成・プロパティ登録
+    getHealthyMediaFolder();
+    
     // デフォルトのシート1が残っていれば削除
     const sheet1 = ss.getSheetByName('シート1');
     if (sheet1) ss.deleteSheet(sheet1);
@@ -166,6 +169,76 @@ function initializeSetup() {
     return { success: false, error: e.toString() };
   }
 }
+
+// ==========================================
+// お手本メディアフォルダ管理 (Auto-Recovery)
+// ==========================================
+
+/**
+ * 常に健全なお手本フォルダを返す。
+ * MEDIA_FOLDER_ID プロパティが未設定 / フォルダが削除された場合は自動作成して復旧する。
+ */
+function getHealthyMediaFolder() {
+  const folderId = PROPERTIES.getProperty('MEDIA_FOLDER_ID');
+  
+  if (folderId) {
+    try {
+      const folder = DriveApp.getFolderById(folderId);
+      // ゴミ箱に入っていたら復旧できないので別扱い
+      if (!folder.isTrashed()) return folder;
+    } catch (e) {
+      // フォルダが見つからない → 下で再作成
+    }
+  }
+  
+  // 自己修復：新しいフォルダを作成してプロパティに登録
+  const newFolder = DriveApp.createFolder(APP_NAME + ' お手本フォルダ');
+  PROPERTIES.setProperty('MEDIA_FOLDER_ID', newFolder.getId());
+  Logger.log('お手本フォルダを新規作成しました: ' + newFolder.getId());
+  return newFolder;
+}
+
+/**
+ * お手本フォルダ内のファイル一覧を返す（画像・スライド・動画 に絞る）
+ */
+function listMediaFiles() {
+  try {
+    const folder = getHealthyMediaFolder();
+    const files = folder.getFiles();
+    const result = [];
+    
+    const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const SLIDE_TYPE  = 'application/vnd.google-apps.presentation';
+    const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
+
+    while (files.hasNext() && result.length < 100) {
+      const file = files.next();
+      if (file.isTrashed()) continue;
+      
+      const mime = file.getMimeType();
+      let type = 'other';
+      if (IMAGE_TYPES.indexOf(mime) !== -1) type = 'image';
+      else if (mime === SLIDE_TYPE) type = 'slide';
+      else if (VIDEO_TYPES.indexOf(mime) !== -1) type = 'video';
+      
+      result.push({
+        id: file.getId(),
+        name: file.getName(),
+        type: type,
+        url: type === 'slide'
+          ? 'https://docs.google.com/presentation/d/' + file.getId() + '/preview'
+          : 'https://drive.google.com/file/d/' + file.getId() + '/view'
+      });
+    }
+    
+    // アルファベット順にソート
+    result.sort(function(a, b) { return a.name.localeCompare(b.name, 'ja'); });
+    return { success: true, files: result, folderId: folder.getId() };
+  } catch (e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
 
 function getUserInfo() {
   const email = Session.getActiveUser().getEmail();
