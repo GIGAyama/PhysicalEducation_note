@@ -90,16 +90,17 @@
         studentAllActiveUnits = data.activeUnits || [];
         initStudentUnitSelect();
 
+        const classmates = data.classmates || [];
         const targetSelect = document.getElementById('thanks-target');
         targetSelect.innerHTML = '<option value="" selected disabled>選んでください</option>';
-        data.classmates.forEach(c => {
+        classmates.forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.email;
           opt.textContent = c.name;
           targetSelect.appendChild(opt);
         });
 
-        drawRadarChart(data.radarData);
+        drawRadarChart(data.radarData || [0, 0, 0, 0]);
 
         // 履歴を保持してフィルタUIを構築
         studentAllLogs = data.logs || [];
@@ -116,8 +117,6 @@
           document.getElementById('reflect-alert').classList.remove('d-none');
           document.getElementById('form-reflect').classList.add('d-none');
         }
-
-        buildClassmateSelect(data.classmates);
       })
       .catch(err => {
         hideLoading();
