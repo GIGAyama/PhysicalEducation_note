@@ -77,6 +77,8 @@
   }
 
   let studentAllLogs = []; // フィルタリング用に元の配列を保持
+  let studentAllActiveUnits = []; // 児童用に持たせる稼働単元リスト
+  let currentSelectedUnitDetail = null; // 現在選んでいる単元の詳細情報
 
   // ==== 児童用画面ロジック ====
   function loadStudentData() {
@@ -85,7 +87,8 @@
       .then(data => {
         hideLoading();
 
-        document.getElementById('current-unit-badge').textContent = `現在の単元：${data.currentUnit}`;
+        studentAllActiveUnits = data.activeUnits || [];
+        initStudentUnitSelect();
 
         const targetSelect = document.getElementById('thanks-target');
         targetSelect.innerHTML = '<option value="" selected disabled>選んでください</option>';
@@ -120,6 +123,111 @@
         hideLoading();
         showError('データの取得に失敗しました。');
       });
+  }
+
+  // 単元選択ドロップダウンの初期化
+  function initStudentUnitSelect() {
+    const uSelect = document.getElementById('student-unit-select');
+    uSelect.innerHTML = '<option value="" selected disabled>単元をえらぶ...</option>';
+
+    studentAllActiveUnits.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.name;
+      uSelect.appendChild(opt);
+    });
+
+    // UIリセット
+    const sSelect = document.getElementById('student-session-select');
+    if (sSelect) {
+      sSelect.innerHTML = '<option value="">-</option>';
+      sSelect.disabled = true;
+    }
+    updateStudentDisplay(null, null);
+  }
+
+  // 単元が選ばれた時
+  function onStudentUnitChanged() {
+    const selectedId = document.getElementById('student-unit-select').value;
+    const unit = studentAllActiveUnits.find(u => u.id === selectedId);
+    if (!unit) return;
+
+    currentSelectedUnitDetail = unit;
+
+    const sSelect = document.getElementById('student-session-select');
+    sSelect.innerHTML = '<option value="" selected disabled>時間...</option>';
+    sSelect.disabled = false;
+
+    for (let i = 1; i <= unit.totalSessions; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i;
+      sSelect.appendChild(opt);
+    }
+
+    // 何も選ばれていない状態の表示へ
+    updateStudentDisplay(unit, null);
+  }
+
+  // 時間が選ばれた時
+  function onStudentSessionChanged() {
+    if (!currentSelectedUnitDetail) return;
+    const sessionNum = parseInt(document.getElementById('student-session-select').value, 10);
+    updateStudentDisplay(currentSelectedUnitDetail, sessionNum);
+  }
+
+  // 画面の表示（プログレスバー、目標、めあて、お手本）の更新
+  function updateStudentDisplay(unit, sessionNum) {
+    const badge = document.getElementById('current-unit-badge');
+    const uGoal = document.getElementById('student-unit-goal');
+    const sGoal = document.getElementById('student-session-goal');
+    const sText = document.getElementById('student-session-text');
+    const pBar = document.getElementById('student-progress-bar');
+    const btnRef = document.getElementById('btn-view-ref');
+
+    currentRefBase64 = null; // お手本リセット
+    if (btnRef) btnRef.classList.add('d-none');
+
+    if (!unit) {
+      if (badge) {
+        badge.textContent = '単元をえらんでね';
+        badge.className = 'badge bg-secondary text-white fs-6 rounded-pill px-3 py-2';
+      }
+      if (uGoal) uGoal.textContent = '未設定';
+      if (sGoal) sGoal.textContent = '単元と時間をえらんでね';
+      if (sText) sText.textContent = '第-時 / 全-時間';
+      if (pBar) pBar.style.width = '0%';
+      return;
+    }
+
+    if (badge) {
+      badge.textContent = `学習中：${unit.name}`;
+      badge.className = 'badge bg-info text-dark fs-6 rounded-pill px-3 py-2 border shadow-sm';
+    }
+    if (uGoal) uGoal.textContent = unit.goal || '未設定';
+
+    if (!sessionNum) {
+      if (sGoal) sGoal.textContent = '時間をえらんでね';
+      if (sText) sText.textContent = `第-時 / 全${unit.totalSessions}時間`;
+      if (pBar) pBar.style.width = '0%';
+      return;
+    }
+
+    if (sText) sText.textContent = `第${sessionNum}時 / 全${unit.totalSessions}時間`;
+    const progress = Math.min(100, Math.max(0, (sessionNum / unit.totalSessions) * 100));
+    if (pBar) pBar.style.width = `${progress}%`;
+
+    // JSONからの該当時の設定を取得
+    const sessionData = (unit.sessions || []).find(s => parseInt(s.session, 10) === sessionNum);
+    if (sessionData) {
+      if (sGoal) sGoal.textContent = sessionData.goal || '（未設定）';
+      if (sessionData.mediaId && btnRef) {
+        btnRef.classList.remove('d-none');
+        btnRef.onclick = () => openReferenceModalFor(sessionData.mediaId);
+      }
+    } else {
+      if (sGoal) sGoal.textContent = '（この時間の設定はありません）';
+    }
   }
 
   function setupStudentForms() {
