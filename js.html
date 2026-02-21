@@ -142,7 +142,58 @@
       sSelect.innerHTML = '<option value="">-</option>';
       sSelect.disabled = true;
     }
-    updateStudentDisplay(null, null);
+
+    // ==== 次に取り組む単元・時間の自動選択ロジック ====
+    if (studentAllActiveUnits.length > 0) {
+      let targetUnit = null;
+      let nextSession = 1;
+
+      // 最新のログ（新しい順）から、稼働中の単元に関する直近の記録を探す
+      for (const log of studentAllLogs) {
+        const match = studentAllActiveUnits.find(u => u.id === log.unitId || u.name === log.unit);
+        if (match) {
+          targetUnit = match;
+
+          // この単元において、「事後振り返り」が完了している最大の授業回を探す
+          let maxReflectSession = 0;
+          const unitLogs = studentAllLogs.filter(l => l.unitId === match.id || l.unit === match.name);
+          unitLogs.forEach(ul => {
+            if (ul.type === '事後振り返り' && ul.session) {
+              const sNum = parseInt(ul.session, 10);
+              if (!isNaN(sNum) && sNum > maxReflectSession) {
+                maxReflectSession = sNum;
+              }
+            }
+          });
+
+          // 次の時間は、最後に振り返りまで終わった時間の「次」 (最大値は単元の総時間数)
+          nextSession = Math.min(maxReflectSession + 1, targetUnit.totalSessions);
+          break;
+        }
+      }
+
+      // もし直近の記録がなければ、リストの一番上の単元をデフォルトにする
+      if (!targetUnit) {
+        targetUnit = studentAllActiveUnits[0];
+        nextSession = 1;
+      }
+
+      // 値をセットし、連動イベントを手動発火
+      uSelect.value = targetUnit.id;
+      onStudentUnitChanged(); // 時間のプルダウンオプションが生成される
+
+      // DOM更新完了を待ってから時間の初期値をセット
+      setTimeout(() => {
+        const sSel = document.getElementById('student-session-select');
+        if (sSel && sSel.querySelector(`option[value="${nextSession}"]`)) {
+          sSel.value = nextSession;
+          onStudentSessionChanged();
+        }
+      }, 0);
+
+    } else {
+      updateStudentDisplay(null, null);
+    }
   }
 
   // 単元が選ばれた時

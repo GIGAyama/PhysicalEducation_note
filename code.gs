@@ -342,7 +342,10 @@ function getStudentData(email) {
         date: Utilities.formatDate(dateObj, Session.getScriptTimeZone(), "MM/dd"),
         type: type,
         aspect: aspect,
-        comment: row[logMap['コメント']]
+        comment: row[logMap['コメント']],
+        unit: row[logMap['単元名']] || '',
+        unitId: row[logMap['単元ID']] || '',
+        session: row[logMap['授業回']] || ''
       });
 
       if (dateStr === todayStr) {
