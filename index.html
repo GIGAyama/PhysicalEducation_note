@@ -266,11 +266,16 @@
                     <h5 class="card-title fw-bold m-0">
                       <i class="bi bi-clock-history text-info"></i> これまでの<ruby>記録<rt>きろく</rt></ruby>
                     </h5>
-                    <!-- 単元フィルタ -->
-                    <select id="history-filter" class="form-select form-select-sm w-auto rounded-pill"
-                      onchange="filterHistory()">
-                      <option value="all">すべて</option>
-                    </select>
+                    <!-- 単元フィルタとポートフォリオボタン -->
+                    <div class="d-flex gap-2">
+                      <select id="history-filter" class="form-select form-select-sm w-auto rounded-pill"
+                        onchange="filterHistory()">
+                        <option value="all">すべて</option>
+                      </select>
+                      <button class="btn btn-sm btn-outline-info rounded-pill" onclick="openStudentPortfolio()">
+                        <i class="bi bi-person-lines-fill"></i> マイ・ポートフォリオ
+                      </button>
+                    </div>
                   </div>
                   <div id="history-list" class="overflow-auto" style="max-height: 250px;">
                     <!-- JSで動的に追加 -->
@@ -291,6 +296,58 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 児童：マイ・ポートフォリオ モーダル -->
+      <div class="modal fade" id="studentPortfolioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header bg-info bg-opacity-10">
+              <h5 class="modal-title fw-bold text-info"><i class="bi bi-person-lines-fill"></i> マイ・ポートフォリオ</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+              <div class="row g-4">
+                <!-- 左：総合チャート -->
+                <div class="col-lg-4">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body text-center">
+                      <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-radar"></i> <ruby>総合<rt>そうごう</rt>
+                          </ruby>チャート</h6>
+                      <div style="width: 100%; max-width: 300px; margin: 0 auto;">
+                        <canvas id="portfolioRadarChart"></canvas>
+                      </div>
+                      <p class="small text-muted mt-3">これまでの全ての記録を合わせた力です。</p>
+                    </div>
+                  </div>
+                </div>
+                <!-- 右：タイムライン -->
+                <div class="col-lg-8">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                        <h6 class="fw-bold text-secondary m-0"><i class="bi bi-clock-history"></i> <ruby>学習<rt>がくしゅう
+                            </rt></ruby>の<ruby>歴史<rt>れきし</rt></ruby></h6>
+                        <select id="portfolio-unit-filter" class="form-select form-select-sm w-auto rounded-pill"
+                          onchange="renderStudentPortfolioTimeline()">
+                          <option value="all">すべての単元</option>
+                          <!-- JSで動的に追加 -->
+                        </select>
+                      </div>
+                      <div id="portfolio-timeline" class="overflow-auto pe-2" style="max-height: 500px;">
+                        <!-- JSでタイムライン生成 -->
+                        <div class="text-center text-muted py-5">記録を読み込んでいます...</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer pb-2 pt-2">
+              <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">とじる</button>
             </div>
           </div>
         </div>
