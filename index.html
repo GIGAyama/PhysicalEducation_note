@@ -316,7 +316,7 @@
                   <div class="card shadow-sm border-0 h-100">
                     <div class="card-body text-center">
                       <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-radar"></i> <ruby>総合<rt>そうごう</rt>
-                          </ruby>チャート</h6>
+                        </ruby>チャート</h6>
                       <div style="width: 100%; max-width: 300px; margin: 0 auto;">
                         <canvas id="portfolioRadarChart"></canvas>
                       </div>
@@ -380,6 +380,35 @@
           </div>
         </div>
 
+        <!-- ★ クラスポートフォリオ（全体分析）エリア -->
+        <div class="card shadow-sm border-0 rounded-3 mb-4 bg-info bg-opacity-10 border-info border-opacity-25">
+          <div class="card-header bg-transparent py-3 border-bottom border-info border-opacity-25">
+            <h5 class="card-title fw-bold m-0 text-info">
+              <i class="bi bi-graph-up"></i> クラスのアクティビティ分析
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-4">
+              <!-- 左：クラス全体の観点バランス -->
+              <div class="col-md-5 text-center border-end border-info border-opacity-25">
+                <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-radar"></i> クラス全体の力のバランス</h6>
+                <div style="width: 100%; max-width: 250px; margin: 0 auto;">
+                  <canvas id="classRadarChart"></canvas>
+                </div>
+                <p class="small text-muted mt-2">※これまで全員が選んだ「振り返りの観点」の合計</p>
+              </div>
+              <!-- 右：直近の回答数推移 -->
+              <div class="col-md-7">
+                <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-bar-chart-line"></i> 直近の振り返り提出数（過去2週間）</h6>
+                <div style="width: 100%; height: 250px;">
+                  <canvas id="classTrendChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 本日の学習状況一覧エリア -->
         <div class="card shadow-sm border-0 rounded-3">
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">

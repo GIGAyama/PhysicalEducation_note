@@ -640,10 +640,86 @@
         }
 
         renderTeacherTable(data.students);
+
+        // ★ クラスポートフォリオ（全体分析）の描画
+        if (data.classStats) {
+          renderClassPortfolio(data.classStats);
+        }
       })
       .catch(err => {
         hideLoading();
-        showError('児童データの取得に失敗しました。');
+        showError('教員用データの読み込みに失敗しました。');
+      });
+  }
+
+  // ==== 教員用 クラスポートフォリオ描画 ====
+  let classRadarChartInst = null;
+  let classTrendChartInst = null;
+
+  function renderClassPortfolio(stats) {
+    // 1. クラス全体の観点バランス（レーダーチャート）
+    const rCtx = document.getElementById('classRadarChart').getContext('2d');
+    if (classRadarChartInst) classRadarChartInst.destroy();
+
+    // データは固定順：知る、見る、する、支える
+    const radarDataArr = [
+      stats.radarData['知る'] || 0,
+      stats.radarData['見る'] || 0,
+      stats.radarData['する'] || 0,
+      stats.radarData['支える'] || 0
+    ];
+
+    classRadarChartInst = new Chart(rCtx, {
+      type: 'radar',
+      data: {
+        labels: ['知る', '見る', 'する', '支える'],
+        datasets: [{
+          label: '選択された合計回数',
+          data: radarDataArr,
+          backgroundColor: 'rgba(13, 202, 240, 0.2)', // Info color
+          borderColor: 'rgba(13, 202, 240, 1)',
+          pointBackgroundColor: 'rgba(13, 202, 240, 1)',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        scales: { r: { beginAtZero: true, ticks: { stepSize: 1, display: false } } },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // 2. 直近の提出数推移（棒グラフ）
+    const tCtx = document.getElementById('classTrendChart').getContext('2d');
+    if (classTrendChartInst) classTrendChartInst.destroy();
+
+    // Stats オブジェクトのキー（MM/dd）をソートして配列化
+    const dailyKeys = Object.keys(stats.dailyTrend).sort();
+    const dailyData = dailyKeys.map(k => stats.dailyTrend[k]);
+
+    classTrendChartInst = new Chart(tCtx, {
+      type: 'bar',
+      data: {
+        labels: dailyKeys,
+        datasets: [{
+          label: '振り返り提出数',
+          data: dailyData,
+          backgroundColor: 'rgba(26, 115, 232, 0.7)', // Primary color
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+  showError('児童データの取得に失敗しました。');
       });
   }
 

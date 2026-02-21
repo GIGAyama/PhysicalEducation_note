@@ -438,6 +438,24 @@ function getTeacherData() {
   const mData = membersSheet.getDataRange().getValues();
   const lData = logSheet.getDataRange().getValues();
   
+  // ==== クラスポートフォリオ用集計 ====
+  let classStats = {
+    radarData: { '知る': 0, '見る': 0, 'する': 0, '支える': 0 },
+    dailyTrend: {} // { "MM/dd": { count: 0 } }
+  };
+  
+  // 月日フォーマット作成ヘルパー
+  const getMMDD = (d) => Utilities.formatDate(d, Session.getScriptTimeZone(), "MM/dd");
+  
+  // 過去2週間の日付の器を作っておく
+  const today = new Date();
+  for (let d = 14; d >= 0; d--) {
+    let tempDate = new Date();
+    tempDate.setDate(today.getDate() - d);
+    classStats.dailyTrend[getMMDD(tempDate)] = 0;
+  }
+
+  
   const todayStr = new Date().toDateString();
   let students = [];
   
@@ -480,6 +498,17 @@ function getTeacherData() {
     if (student) {
       if (type === '事後振り返り') {
         student.allAspects.push(aspect);
+        
+        // クラス全体のレーダーチャート集計
+        if (classStats.radarData[aspect] !== undefined) {
+          classStats.radarData[aspect]++;
+        }
+        
+        // クラス全体の日別提出推移（過去2週間以内ならカウント）
+        const mmdd = getMMDD(dateObj);
+        if (classStats.dailyTrend[mmdd] !== undefined) {
+          classStats.dailyTrend[mmdd]++;
+        }
       }
       if (dateStr === todayStr) {
         if (type === '事前目標') student.todayGoalAspect = aspect;
@@ -503,7 +532,8 @@ function getTeacherData() {
   students.sort((a, b) => (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0));
   return { 
     students: students, 
-    activeUnits: activeUnits
+    activeUnits: activeUnits,
+    classStats: classStats
   };
 }
 
