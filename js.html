@@ -425,18 +425,59 @@
   }
 
   // ==== お手本画像モーダル ====
-  function openReferenceModalFor(mediaId) {
+  function openReferenceModalFor(mediaInput) {
+    if (!mediaInput) return;
+
     const imgEl = document.getElementById('reference-image');
+    const iframeContainer = document.getElementById('reference-iframe-container');
+    const iframeEl = document.getElementById('reference-iframe');
     const loadingEl = document.getElementById('ref-loading');
     const modal = new bootstrap.Modal(document.getElementById('referenceModal'));
 
+    // 初期化
+    imgEl.classList.add('d-none');
+    iframeContainer.classList.add('d-none');
+    iframeEl.src = '';
+    loadingEl.classList.remove('d-none');
     modal.show();
 
-    loadingEl.classList.remove('d-none');
-    imgEl.classList.add('d-none');
+    // 1. Google スライドのURL判定
+    // ex: https://docs.google.com/presentation/d/xxxxx/edit#slide=id.p
+    // または "pub" リンク: https://docs.google.com/presentation/d/e/xxxxx/pub?start=false...
+    const slideMatch = mediaInput.match(/docs\.google\.com\/presentation\/d\/(e\/)?([a-zA-Z0-9_-]+)/);
+    if (slideMatch) {
+      const isPub = slideMatch[1] === 'e/';
+      const slideId = slideMatch[2];
+      // pubリンクならそのままに近い形、editリンクならpreviewリンクへ変換
+      const embedUrl = isPub 
+        ? `https://docs.google.com/presentation/d/e/${slideId}/embed?start=false&loop=false&delayms=3000`
+        : `https://docs.google.com/presentation/d/${slideId}/preview`;
+      
+      iframeEl.src = embedUrl;
+      loadingEl.classList.add('d-none');
+      iframeContainer.classList.remove('d-none');
+      return;
+    }
 
-    // mediaId を渡してベース64を取得するバックエンドAPIへ
-    runGoogleScript('getReferenceImageBase64', mediaId)
+    // 2. YouTubeのURL判定
+    const ytMatch = mediaInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    if (ytMatch) {
+      const embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
+      iframeEl.src = embedUrl;
+      loadingEl.classList.add('d-none');
+      iframeContainer.classList.remove('d-none');
+      return;
+    }
+
+    // 3. Google Driveの画像URLからIDを抽出して表示（あるいはただのID文字列の場合）
+    let driveId = mediaInput;
+    const driveMatch = mediaInput.match(/d\/([a-zA-Z0-9_-]+)/) || mediaInput.match(/id=([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      driveId = driveMatch[1];
+    }
+
+    // Driveの画像としてバックエンドにBase64化を依頼
+    runGoogleScript('getReferenceImageBase64', driveId)
       .then(base64 => {
         loadingEl.classList.add('d-none');
         imgEl.src = base64;
@@ -445,7 +486,7 @@
       .catch(err => {
         loadingEl.classList.add('d-none');
         modal.hide();
-        showError('画像を取得できませんでした。先生による設定か共有権限を確認してください。');
+        showError('画像を取得できませんでした。権限などをご確認ください。');
       });
   }
 
@@ -465,6 +506,7 @@
           emptyMsg.classList.remove('d-none');
         } else {
           emptyMsg.classList.add('d-none');
+          teacherAllActiveUnits = data.activeUnits; // 編集モーダルですぐ参照できるように保持
           data.activeUnits.forEach(unit => {
             const col = document.createElement('div');
             col.className = 'col-md-6 col-lg-4';
@@ -476,7 +518,10 @@
                     <span class="badge bg-light text-dark border">全${unit.totalSessions}時間</span>
                   </div>
                   <p class="card-text small text-muted mb-3" style="min-height: 2.5em;">${escapeHtml(unit.goal)}</p>
-                  <div class="d-flex justify-content-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-sm btn-outline-info rounded-pill" onclick="openUnitManagerModal('${unit.id}')">
+                      <i class="bi bi-pencil"></i> 編集する
+                    </button>
                     <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="archiveUnit('${unit.id}', '${escapeHtml(unit.name)}')">
                       <i class="bi bi-box-arrow-down"></i> 終了する
                     </button>
@@ -497,15 +542,53 @@
   }
 
   // ==== 単元マネージャー関連 ====
-  function openUnitManagerModal() {
-    document.getElementById('form-create-unit').reset();
-    document.getElementById('form-create-unit').classList.remove('was-validated');
-    generateSessionInputs(); // 初期化時に生成
+  let teacherAllActiveUnits = []; // 教員が管理中のアクティブ単元をJSONとして保持
+
+  // 新規作成 or 編集 用にモーダルを開く
+  function openUnitManagerModal(editUnitId = null) {
+    const form = document.getElementById('form-create-unit');
+    form.reset();
+    form.classList.remove('was-validated');
+
+    document.getElementById('edit-unit-id').value = editUnitId || "";
+
+    const titleEl = document.getElementById('unit-modal-title');
+    const alertEl = document.getElementById('unit-modal-alert');
+    const btnSubmit = document.getElementById('btn-submit-unit');
+
+    if (editUnitId) {
+      // 編集モード
+      const unit = teacherAllActiveUnits.find(u => u.id === editUnitId);
+      if (unit) {
+        titleEl.innerHTML = '<i class="bi bi-pencil-square"></i> 単元の設定を編集';
+        alertEl.classList.add('d-none');
+        btnSubmit.textContent = '変更を保存する';
+
+        document.getElementById('new-unit-name').value = unit.name;
+        document.getElementById('new-unit-sessions').value = unit.totalSessions;
+        document.getElementById('new-unit-goal').value = unit.goal;
+
+        generateSessionInputs(unit.sessions); // 既存データで入力欄生成
+      }
+    } else {
+      // 新規作成モード
+      titleEl.innerHTML = '<i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt></ruby>しい<ruby>単元<rt>たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby>';
+      alertEl.classList.remove('d-none');
+      btnSubmit.textContent = '単元を作成して開始する';
+      document.getElementById('new-unit-sessions').value = 6;
+      generateSessionInputs();
+    }
+
     const modal = new bootstrap.Modal(document.getElementById('unitManagerModal'));
     modal.show();
   }
 
-  function generateSessionInputs() {
+  // 時間数変更時に手動で再生成するイベント（編集時の警告含む）
+  document.getElementById('new-unit-sessions').addEventListener('change', () => {
+    generateSessionInputs();
+  });
+
+  function generateSessionInputs(existingSessions = null) {
     const total = parseInt(document.getElementById('new-unit-sessions').value, 10);
     const container = document.getElementById('dynamic-sessions-container');
     container.innerHTML = '';
@@ -516,19 +599,29 @@
     }
 
     for (let i = 1; i <= total; i++) {
+      let prefGoal = "";
+      let prefMedia = "";
+      if (existingSessions && existingSessions.length > 0) {
+        const sData = existingSessions.find(s => parseInt(s.session, 10) === i);
+        if (sData) {
+          prefGoal = sData.goal || "";
+          prefMedia = sData.mediaId || ""; // 過去の仕様ではDrive ID、今後はURLの場合もある
+        }
+      }
+
       const div = document.createElement('div');
       div.className = 'mb-3 pb-3 border-bottom';
       div.innerHTML = `
         <div class="fw-bold text-secondary mb-2">第${i}時</div>
         <div class="row g-2">
           <div class="col-md-7">
-            <input type="text" class="form-control form-control-sm session-goal-input" data-session="${i}" placeholder="この時間のめあて" required>
+            <input type="text" class="form-control form-control-sm session-goal-input" data-session="${i}" placeholder="この時間のめあて" value="${escapeHtml(prefGoal)}" required>
             <div class="invalid-feedback">入力は必須です</div>
           </div>
           <div class="col-md-5">
             <div class="input-group input-group-sm">
               <span class="input-group-text"><i class="bi bi-image"></i></span>
-              <input type="text" class="form-control session-media-input" data-session="${i}" placeholder="お手本ID(任意)">
+              <input type="text" class="form-control session-media-input" data-session="${i}" placeholder="画像やスライドのURLを貼り付け(任意)" value="${escapeHtml(prefMedia)}">
             </div>
           </div>
         </div>
@@ -537,18 +630,19 @@
     }
   }
 
-  function submitNewUnit() {
+  function submitUnit() {
     const form = document.getElementById('form-create-unit');
     if (!form.checkValidity()) {
       form.classList.add('was-validated');
       return;
     }
 
+    const editUnitId = document.getElementById('edit-unit-id').value;
     const uName = document.getElementById('new-unit-name').value;
     const uSessions = parseInt(document.getElementById('new-unit-sessions').value, 10);
     const uGoal = document.getElementById('new-unit-goal').value;
 
-    // 各時間詳細配列の組み立て
+    // 各時間詳細配列の組み立て（ここは単なる文字列URLをそのまま格納する）
     const sessionsArray = [];
     const goalInputs = document.querySelectorAll('.session-goal-input');
     const mediaInputs = document.querySelectorAll('.session-media-input');
@@ -557,24 +651,36 @@
       sessionsArray.push({
         session: parseInt(goalInputs[i].dataset.session, 10),
         goal: goalInputs[i].value,
-        mediaId: mediaInputs[i].value
+        mediaId: mediaInputs[i].value.trim()
       });
     }
 
     showLoading();
     bootstrap.Modal.getInstance(document.getElementById('unitManagerModal')).hide();
 
-    runGoogleScript('createUnit', uName, uSessions, uGoal, sessionsArray)
-      .then(res => {
-        if (res.success) {
-          Swal.fire({ icon: 'success', title: '新しい単元パッケージを開始しました', confirmButtonColor: '#1a73e8' });
-          loadTeacherData(); // 再読み込み
-        }
-      })
-      .catch(err => {
-        hideLoading();
-        showError('単元の作成に失敗しました。');
-      });
+    if (editUnitId) {
+      // 編集（更新）
+      runGoogleScript('updateUnit', editUnitId, uName, uSessions, uGoal, sessionsArray)
+        .then(res => {
+          if (res.success) {
+            Swal.fire({ icon: 'success', title: '単元を更新しました', confirmButtonColor: '#1a73e8' });
+            loadTeacherData();
+          } else {
+            hideLoading(); showError(res.message);
+          }
+        })
+        .catch(err => { hideLoading(); showError('更新に失敗しました。'); });
+    } else {
+      // 新規作成
+      runGoogleScript('createUnit', uName, uSessions, uGoal, sessionsArray)
+        .then(res => {
+          if (res.success) {
+            Swal.fire({ icon: 'success', title: '新しい単元パッケージを開始しました', confirmButtonColor: '#1a73e8' });
+            loadTeacherData();
+          }
+        })
+        .catch(err => { hideLoading(); showError('単元の作成に失敗しました。'); });
+    }
   }
 
   function archiveUnit(unitId, unitName) {

@@ -385,15 +385,19 @@
             </ruby></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body text-center">
-          <div id="ref-loading" class="text-center my-5" role="status">
+        <div class="modal-body text-center" style="position: relative; min-height: 200px;">
+          <div id="ref-loading" class="text-center my-5 position-absolute top-50 start-50 translate-middle"
+            style="z-index: 10;" role="status">
             <div class="running-container">
               <i class="bi bi-person-walking running-man" style="font-size: 2.5rem;"></i>
               <div class="loading-track" style="width: 60px;"></div>
-              <div class="loading-text-animated mt-2 small">画像を取得中...</div>
+              <div class="loading-text-animated mt-2 small">読み込み中...</div>
             </div>
           </div>
           <img id="reference-image" src="" class="img-fluid rounded shadow d-none" alt="お手本画像">
+          <div class="ratio ratio-16x9 d-none" id="reference-iframe-container">
+            <iframe id="reference-iframe" src="" class="rounded shadow" allowfullscreen></iframe>
+          </div>
         </div>
       </div>
     </div>
@@ -456,14 +460,15 @@
   <div class="modal fade" id="unitManagerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title fw-bold"><i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt></ruby>しい<ruby>単元<rt>
-                たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby></h5>
+        <div class="modal-header bg-primary text-white" id="unit-modal-header">
+          <h5 class="modal-title fw-bold" id="unit-modal-title"><i class="bi bi-journal-plus"></i> <ruby>新<rt>あたら</rt>
+            </ruby>しい<ruby>単元<rt>たんげん</rt></ruby>の<ruby>作成<rt>さくせい</rt></ruby></h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-info small" role="alert">
-            <i class="bi bi-info-circle"></i> 新しい単元を作成すると、現在の単元はアーカイブされます（過去の記録として残ります）。
+          <input type="hidden" id="edit-unit-id" value="">
+          <div class="alert alert-info small" role="alert" id="unit-modal-alert">
+            <i class="bi bi-info-circle"></i> 新しい単元を作成すると、既存のアクティブな単元と並行して進めることができます。
           </div>
           <form id="form-create-unit" class="needs-validation" novalidate>
             <div class="mb-3">
@@ -489,7 +494,8 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-          <button type="button" class="btn btn-primary fw-bold" onclick="submitNewUnit()">単元を作成して開始する</button>
+          <button type="button" class="btn btn-primary fw-bold" id="btn-submit-unit"
+            onclick="submitUnit()">単元を作成して開始する</button>
         </div>
       </div>
     </div>

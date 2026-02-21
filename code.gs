@@ -618,6 +618,21 @@ function createUnit(unitName, totalSessions, unitGoal, sessionsJsonData) {
   return { success: true, newUnitId: newUnitId };
 }
 
+function updateUnit(unitId, unitName, totalSessions, unitGoal, sessionsJsonData) {
+  const { unitSheet, unitMap } = getHealthySpreadsheet();
+  const uData = unitSheet.getDataRange().getValues();
+  for (let i = 1; i < uData.length; i++) {
+    if (uData[i][unitMap['単元ID']] === unitId) {
+      unitSheet.getRange(i + 1, unitMap['単元名'] + 1).setValue(unitName);
+      unitSheet.getRange(i + 1, unitMap['総時間数'] + 1).setValue(totalSessions);
+      unitSheet.getRange(i + 1, unitMap['単元目標'] + 1).setValue(unitGoal);
+      unitSheet.getRange(i + 1, unitMap['授業詳細JSON'] + 1).setValue(JSON.stringify(sessionsJsonData || []));
+      return { success: true };
+    }
+  }
+  return { success: false, message: '更新対象の単元が見つかりません' };
+}
+
 function archiveUnit(unitId) {
   const { unitSheet, unitMap } = getHealthySpreadsheet();
   const uData = unitSheet.getDataRange().getValues();
