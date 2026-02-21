@@ -1,10 +1,10 @@
 /**
- * スポ☆活ダッシュボード - Server Logic
+ * 体育ノート - Server Logic
  * GIGA Standard v2 Compliant
  * [Auto-Recovery & Dynamic Header Mapping Enabled]
  */
 
-const APP_NAME = 'スポ☆活ダッシュボード';
+const APP_NAME = '体育ノート';
 const PROPERTIES = PropertiesService.getScriptProperties();
 
 // ==== 定義（必須シートと必須列） ====
