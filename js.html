@@ -862,59 +862,57 @@
 
   // ==== Driveファイルピッカー ====
   let drivePickerTargetId = null;   // 選択後に値をセットする入力欄のID
-  let driveFilesCache = null;       // 返り値をキャッシュする（モーダル開くたびにAPIを叁らないため）
 
   function openDrivePicker(inputId) {
     drivePickerTargetId = inputId;
     const modal = new bootstrap.Modal(document.getElementById('drivePickerModal'));
     modal.show();
 
-    if (driveFilesCache && driveFilesCache.length > 0) {
-      // キャッシュがあれまた好もなすぐ描画
-      renderDriveFiles(driveFilesCache);
-    } else {
-      document.getElementById('drive-file-list').innerHTML =
-        '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div> 読み込み中...</div>';
-
-      runGoogleScript('listMediaFiles')
-        .then(function (res) {
-          if (res.success) {
-            driveFilesCache = res.files;
-            // フォルダへのリンクを設定
-            var folderLink = document.getElementById('drive-folder-link');
-            folderLink.href = 'https://drive.google.com/drive/folders/' + res.folderId;
-            renderDriveFiles(driveFilesCache);
-          } else {
-            document.getElementById('drive-file-list').innerHTML =
-              '<div class="alert alert-danger small">フォルダの内容を取得できませんでした。</div>';
-          }
-        })
-        .catch(function () {
-          document.getElementById('drive-file-list').innerHTML =
-            '<div class="alert alert-danger small">通信エラーが発生しました。</div>';
-        });
-    }
-
     // 検索ボックスの初期化
     var searchBox = document.getElementById('drive-search-box');
     searchBox.value = '';
+
+    // 初期読み込み（全件からの最新50件）
+    searchDriveFiles('');
+
+    let debounceTimer;
     searchBox.oninput = function () {
-      if (driveFilesCache) renderDriveFiles(driveFilesCache);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        searchDriveFiles(searchBox.value);
+      }, 600);
     };
   }
 
+  function searchDriveFiles(query) {
+    document.getElementById('drive-file-list').innerHTML =
+      '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-warning me-2"></div> 検索中...</div>';
+
+    runGoogleScript('listMediaFiles', query)
+      .then(function (res) {
+        if (res.success) {
+          renderDriveFiles(res.files);
+        } else {
+          document.getElementById('drive-file-list').innerHTML =
+            '<div class="alert alert-danger small">検索に失敗しました。</div>';
+        }
+      })
+      .catch(function () {
+        document.getElementById('drive-file-list').innerHTML =
+          '<div class="alert alert-danger small">通信エラーが発生しました。</div>';
+      });
+  }
+
   function renderDriveFiles(files) {
-    var query = (document.getElementById('drive-search-box').value || '').toLowerCase();
-    var filtered = files.filter(function (f) { return f.name.toLowerCase().indexOf(query) !== -1; });
     var container = document.getElementById('drive-file-list');
 
-    if (filtered.length === 0) {
-      container.innerHTML = '<div class="text-muted text-center py-4">該当するファイルがありません。</div>';
+    if (!files || files.length === 0) {
+      container.innerHTML = '<div class="text-muted text-center py-4">該当するファイルがドライブに見つかりません。</div>';
       return;
     }
 
     var html = '<div class="list-group list-group-flush">';
-    filtered.forEach(function (f) {
+    files.forEach(function (f) {
       var icon = f.type === 'slide' ? 'bi-file-earmark-slides text-warning'
         : f.type === 'image' ? 'bi-file-earmark-image text-info'
           : f.type === 'video' ? 'bi-file-earmark-play text-danger'

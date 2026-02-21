@@ -199,24 +199,37 @@ function getHealthyMediaFolder() {
 }
 
 /**
- * お手本フォルダ内のファイル一覧を返す（画像・スライド・動画 に絞る）
+ * Googleドライブ全体からメディアファイル（画像・スライド・動画）を検索して一覧を返す
  */
-function listMediaFiles() {
+function listMediaFiles(searchQuery = '') {
   try {
-    const folder = getHealthyMediaFolder();
-    const files = folder.getFiles();
-    const result = [];
-    
     const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const SLIDE_TYPE  = 'application/vnd.google-apps.presentation';
     const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
 
-    while (files.hasNext() && result.length < 100) {
+    let mimeCondition = '(' + [
+      ...IMAGE_TYPES.map(t => "mimeType='" + t + "'"),
+      "mimeType='" + SLIDE_TYPE + "'",
+      ...VIDEO_TYPES.map(t => "mimeType='" + t + "'")
+    ].join(' or ') + ')';
+
+    let q = mimeCondition + " and trashed = false";
+    
+    // キーワードが指定されている場合はファイル名で絞り込み
+    if (searchQuery && typeof searchQuery === 'string' && searchQuery.trim() !== '') {
+      let escapedQuery = searchQuery.replace(/'/g, "\\'"); // 'をエスケープ
+      q += " and title contains '" + escapedQuery + "'";
+    }
+
+    const files = DriveApp.searchFiles(q);
+    const result = [];
+    
+    // 最大50件取得
+    while (files.hasNext() && result.length < 50) {
       const file = files.next();
-      if (file.isTrashed()) continue;
-      
       const mime = file.getMimeType();
       let type = 'other';
+      
       if (IMAGE_TYPES.indexOf(mime) !== -1) type = 'image';
       else if (mime === SLIDE_TYPE) type = 'slide';
       else if (VIDEO_TYPES.indexOf(mime) !== -1) type = 'video';
@@ -231,9 +244,9 @@ function listMediaFiles() {
       });
     }
     
-    // アルファベット順にソート
+    // 名前順ソート
     result.sort(function(a, b) { return a.name.localeCompare(b.name, 'ja'); });
-    return { success: true, files: result, folderId: folder.getId() };
+    return { success: true, files: result };
   } catch (e) {
     return { success: false, error: e.toString() };
   }
