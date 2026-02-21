@@ -449,10 +449,10 @@
       const isPub = slideMatch[1] === 'e/';
       const slideId = slideMatch[2];
       // pubリンクならそのままに近い形、editリンクならpreviewリンクへ変換
-      const embedUrl = isPub 
-        ? `https://docs.google.com/presentation/d/e/${slideId}/embed?start=false&loop=false&delayms=3000`
-        : `https://docs.google.com/presentation/d/${slideId}/preview`;
-      
+      const embedUrl = isPub
+        ? 'https://docs.google.com/presentation/d/e/' + slideId + '/embed?start=false&loop=false&delayms=3000'
+        : 'https://docs.google.com/presentation/d/' + slideId + '/preview';
+
       iframeEl.src = embedUrl;
       loadingEl.classList.add('d-none');
       iframeContainer.classList.remove('d-none');
@@ -462,7 +462,7 @@
     // 2. YouTubeのURL判定
     const ytMatch = mediaInput.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
     if (ytMatch) {
-      const embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
+      const embedUrl = 'https://www.youtube.com/embed/' + ytMatch[1];
       iframeEl.src = embedUrl;
       loadingEl.classList.add('d-none');
       iframeContainer.classList.remove('d-none');
