@@ -470,10 +470,11 @@
     }
 
     // 3. Google Driveの画像URLからIDを抽出して表示（あるいはただのID文字列の場合）
-    let driveId = mediaInput;
-    const driveMatch = mediaInput.match(/d\/([a-zA-Z0-9_-]+)/) || mediaInput.match(/id=([a-zA-Z0-9_-]+)/);
+    let driveId = mediaInput.trim();
+    // URLの中からIDっぽい部分（ランダムな英数字-_が25文字以上続くもの）を抽出
+    const driveMatch = driveId.match(/[-\w]{25,}/);
     if (driveMatch) {
-      driveId = driveMatch[1];
+      driveId = driveMatch[0];
     }
 
     // Driveの画像としてバックエンドにBase64化を依頼
