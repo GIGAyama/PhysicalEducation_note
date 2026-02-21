@@ -28,7 +28,10 @@ function getHealthySpreadsheet() {
   try {
     ss = SpreadsheetApp.openById(ssId);
   } catch (e) {
-    throw new Error('スプレッドシートにアクセスできません。削除されたか権限がありません。');
+    // 削除されている・権限がない場合の自己修復：自動で新規作成してリカバリする
+    ss = SpreadsheetApp.create(APP_NAME + ' データ (自動復旧)');
+    PROPERTIES.setProperty('SPREADSHEET_ID', ss.getId());
+    // 古いシート1が残るかもしれないので確保処理後に消すなどはお好みですが、ここでは最低限新規SSに置き換えます
   }
 
   // シートの存在確認と復旧
@@ -157,7 +160,8 @@ function initializeSetup() {
     const sheet1 = ss.getSheetByName('シート1');
     if (sheet1) ss.deleteSheet(sheet1);
     
-    return { success: true, url: ss.getUrl() };
+    // ScriptApp.getService().getUrl() で現在のウェブアプリ（実行可能API）URLを取得してフロントへ渡す
+    return { success: true, url: ss.getUrl(), appUrl: ScriptApp.getService().getUrl() };
   } catch (e) {
     return { success: false, error: e.toString() };
   }

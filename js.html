@@ -64,7 +64,7 @@
             confirmButtonText: 'OK',
             confirmButtonColor: '#1a73e8'
           }).then(() => {
-            window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>";
+            window.top.location.href = res.appUrl;
           });
         } else {
           showError(res.error);
