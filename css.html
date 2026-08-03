@@ -1,17 +1,117 @@
 <style>
   /* GIGA Standard v2: Modern Google Style */
   :root {
-    --primary-color: #1a73e8;
-    /* Google Blue */
+    /* Google Blue 700。もとは #1a73e8（Blue 600）だったが、白地に置くと
+       コントラスト比 4.27 で 4.5:1 に届かず、白抜き文字を載せたときも同じく
+       4.27 だった。1段濃くすると両方 5.0 になり、色の印象はほとんど変わらない。 */
+    --primary-color: #1967d2;
     --bg-color: #f8f9fa;
     /* Off-white */
   }
 
   body {
-    font-family: 'Zen Maru Gothic', sans-serif;
+    /* Zen Maru Gothic は Google Fonts から読む。学校のフィルタリングで
+       そこが塞がれている場合に備え、端末側の日本語フォントを後ろに並べる。
+       届かなくても字が崩れず、そのまま使える。 */
+    font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Yu Gothic UI',
+                 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
     background-color: var(--bg-color);
     color: #333;
     -webkit-font-smoothing: antialiased;
+    /* 児童が画面を連打するので、素早い連打で勝手に拡大するのだけ止める。
+       二本指で広げる余地は残す（見えづらい子が拡大できなくなるため）。 */
+    touch-action: manipulation;
+    /* 切り欠きのある端末やホームバーに、中身が潜り込まないようにする */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 画面いっぱいに広げるものは 100vh ではなく 100dvh を使う。
+     iPad の Safari と Android の Chrome では、アドレスバーが出入りするぶん
+     100vh が実際の表示領域より大きくなり、いちばん下のボタンが隠れて押せなくなる。 */
+  .full-viewport {
+    height: 100dvh;
+  }
+
+  @supports not (height: 100dvh) {
+    .full-viewport {
+      height: 100vh;
+    }
+  }
+
+  /* 見出しの文字は画面幅から決める。320px のスマホから電子黒板まで
+     1本の式でまかなう。固定サイズだと、小さい端末でははみ出し、
+     電子黒板では教室のうしろの席から読めない。 */
+  h1, .h1 { font-size: clamp(1.5rem, 4.5vw, 2.25rem); }
+  h2, .h2 { font-size: clamp(1.3rem, 3.8vw, 1.9rem); }
+  h3, .h3 { font-size: clamp(1.1rem, 3.2vw, 1.6rem); }
+
+  /* 押せるものは、見た目を変えずに当たり判定だけ 44px 以上にする。
+     ボタン自体を大きくすると、詰めて組んである画面が折り返して崩れる。 */
+  .tap-44 { position: relative; }
+  .tap-44::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* 動きに酔いやすい子・前庭障害のある子のための設定を尊重する。
+     OS 側で「視差効果を減らす」を入れている端末では、動きを止める。 */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Windows のハイコントラストモード。色で区別している境目が消えるので枠線を出す。 */
+  @media (forced-colors: active) {
+    .btn, .card, .nav-link, .form-control, .form-select {
+      border: 1px solid ButtonText;
+    }
+  }
+
+  /* キーボードで操作しているときだけ、はっきりした枠を出す */
+  :focus-visible {
+    outline: 3px solid #174ea6;
+    outline-offset: 2px;
+  }
+
+  /* Bootstrap の既定色は、白地に置くと 4.5:1 に届かないものがある。
+     実測した値（白地・14px）：
+       .text-primary        #0d6efd  4.27
+       .text-danger         #dc3545  4.30
+       .btn-outline-info    #0dcaf0  1.96  ← 特に読めない
+     色相は変えず、1段濃い方向へ寄せる。Bootstrap 5.3 の変数を上書きするので、
+     この3つを使っている箇所すべてに一度で効く。 */
+  :root {
+    --bs-primary-text-emphasis: #0a58ca;
+    --bs-danger-text-emphasis: #b02a37;
+    --bs-info-text-emphasis: #087990;
+  }
+
+  .text-primary { color: #0a58ca !important; }
+  .text-danger { color: #b02a37 !important; }
+  .text-info { color: #087990 !important; }
+  /* .text-secondary（#6c757d）は白地で 4.45。あと 0.05 足りない。 */
+  .text-secondary { color: #5c636a !important; }
+
+  .btn-outline-info {
+    --bs-btn-color: #087990;
+    --bs-btn-border-color: #087990;
+    --bs-btn-hover-bg: #087990;
+    --bs-btn-hover-border-color: #087990;
+    --bs-btn-active-bg: #066070;
+    --bs-btn-active-border-color: #066070;
   }
 
   /* ルビの調整: 読みやすくスペースを確保 */
@@ -21,7 +121,25 @@
 
   rt {
     font-size: 0.6em;
-    color: #666;
+    color: #5f6368;
+  }
+
+  /* ふりがなは、下の文字と同じ色にする。
+     色を決め打ちにしていたため、青いボタンの上に置いたふりがなが
+     濃い灰色のまま重なり、比 1.28 で読めなくなっていた（実測）。
+     色を継がせれば、どの面に置いても必ず読める。 */
+  .btn rt,
+  .badge rt,
+  .nav-link rt,
+  .alert rt,
+  [class*="text-white"] rt,
+  [class*="bg-primary"] rt,
+  [class*="bg-success"] rt,
+  [class*="bg-danger"] rt,
+  [class*="bg-warning"] rt,
+  [class*="bg-info"] rt,
+  [class*="bg-dark"] rt {
+    color: inherit;
   }
 
   /* 全画面ローディングオーバーレイ */
