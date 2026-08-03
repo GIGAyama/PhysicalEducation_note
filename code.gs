@@ -141,7 +141,9 @@ function doGet(e) {
   template.isSetup = !ssId;
   return template.evaluate()
     .setTitle(APP_NAME)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    // GAS は画面を iframe で包むため、外枠側の viewport もここで指定する。
+    // index.html の <meta> だけ直しても安全領域が使えるようにならない。
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setFaviconUrl('https://drive.google.com/uc?id=1g7PlclDf5CynFyHrBCBI9yZD_xqSChYn&.png');
 }
 
