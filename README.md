@@ -83,4 +83,4 @@ GIGAスクール構想下の1人1台学習用端末（Chromebook等）での利�
 このプロジェクトは [MIT ライセンス](LICENSE) の下で提供されています。
 
 ---
-*Created by [GIGA山](https://note.com/cute_borage86) in collaboration with AI Partner.*
+*Created by [GIGA山](https://giga-school.com) in collaboration with AI Partner.*
